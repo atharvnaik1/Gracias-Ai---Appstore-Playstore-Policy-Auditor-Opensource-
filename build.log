@@ -1,0 +1,76 @@
+
+> audit-ai-opensourced@1.0.0 build
+> next build
+
+ ⚠ Invalid next.config.mjs options detected: 
+ ⚠     Unrecognized key(s) in object: 'serverComponentsExternalPackages' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+ ⚠ `experimental.serverComponentsExternalPackages` has been moved to `serverExternalPackages`. Please update your next.config.mjs file accordingly.
+ ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /Users/asyncatharv/Desktop/iGracias/package-lock.json as the root directory.
+ To silence this warning, set `outputFileTracingRoot` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats for more information.
+ Detected additional lockfiles: 
+   * /Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/package-lock.json
+
+   ▲ Next.js 15.5.13
+   - Experiments (use with caution):
+     · serverComponentsExternalPackages
+
+   Creating an optimized production build ...
+<w> [webpack.cache.PackFileCacheStrategy] Skipped not serializable cache item 'Compilation/modules|/Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[2]!/Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[3]!/Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/src/app/globals.css': No serializer registered for PostCSSSyntaxError
+<w> while serializing webpack/lib/cache/PackFileCacheStrategy.PackContentItems -> webpack/lib/NormalModule -> webpack/lib/ModuleBuildError -> PostCSSSyntaxError
+Failed to compile.
+
+./src/app/globals.css:1:1
+Syntax error: /Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/src/app/globals.css The `border-border` class does not exist. If `border-border` is a custom class, make sure it is defined within a `@layer` directive.
+
+> 1 | @tailwind base;
+    | ^
+  2 | @tailwind components;
+  3 | @tailwind utilities;
+
+./src/app/globals.css
+Syntax error: /Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/src/app/globals.css The `border-border` class does not exist. If `border-border` is a custom class, make sure it is defined within a `@layer` directive. (1:1)
+
+> 1 | @tailwind base;
+    | ^
+  2 | @tailwind components;
+  3 | @tailwind utilities;
+
+    at tryRunOrWebpackError (/Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/compiled/webpack/bundle5.js:29:316119)
+    at __webpack_require_module__ (/Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/compiled/webpack/bundle5.js:29:131532)
+    at __nested_webpack_require_161494__ (/Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/compiled/webpack/bundle5.js:29:130967)
+    at /Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/compiled/webpack/bundle5.js:29:131824
+    at symbolIterator (/Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/compiled/neo-async/async.js:1:14444)
+    at done (/Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/compiled/neo-async/async.js:1:14824)
+    at Hook.eval [as callAsync] (eval at create (/Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/compiled/webpack/bundle5.js:14:9224), <anonymous>:15:1)
+    at Hook.CALL_ASYNC_DELEGATE [as _callAsync] (/Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/compiled/webpack/bundle5.js:14:6378)
+    at /Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/compiled/webpack/bundle5.js:29:130687
+    at symbolIterator (/Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/compiled/neo-async/async.js:1:14402)
+-- inner error --
+Syntax error: /Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/src/app/globals.css The `border-border` class does not exist. If `border-border` is a custom class, make sure it is defined within a `@layer` directive. (1:1)
+
+> 1 | @tailwind base;
+    | ^
+  2 | @tailwind components;
+  3 | @tailwind utilities;
+
+    at Object.<anonymous> (/Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[2]!/Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[3]!/Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/src/app/globals.css:1:7)
+    at /Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/compiled/webpack/bundle5.js:29:962717
+    at Hook.eval [as call] (eval at create (/Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/compiled/webpack/bundle5.js:14:9002), <anonymous>:7:1)
+    at Hook.CALL_DELEGATE [as _call] (/Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/compiled/webpack/bundle5.js:14:6272)
+    at /Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/compiled/webpack/bundle5.js:29:131565
+    at tryRunOrWebpackError (/Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/compiled/webpack/bundle5.js:29:316073)
+    at __webpack_require_module__ (/Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/compiled/webpack/bundle5.js:29:131532)
+    at __nested_webpack_require_161494__ (/Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/compiled/webpack/bundle5.js:29:130967)
+    at /Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/compiled/webpack/bundle5.js:29:131824
+    at symbolIterator (/Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/compiled/neo-async/async.js:1:14444)
+
+Generated code for /Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[2]!/Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[3]!/Users/asyncatharv/Desktop/iGracias/audit-ai-opensourced/src/app/globals.css
+
+Import trace for requested module:
+./src/app/globals.css
+
+
+> Build failed because of webpack errors

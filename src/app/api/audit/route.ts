@@ -33,8 +33,8 @@ const SKIP_DIRS = new Set([
   'vendor', '__pycache__', '.dart_tool',
 ]);
 
-const MAX_FILE_SIZE = 100_000; // 100KB per individual source file
-const MAX_TOTAL_CONTENT = 800_000; // 800KB total context to Claude
+const MAX_FILE_SIZE = 50_000; // 50KB per individual source file
+const MAX_TOTAL_CONTENT = 350_000; // 350KB total context (roughly ~90k tokens max)
 
 // ─── Streaming Multipart Parser ──────────────────────────────────────────────
 // Pipes file data directly to disk via busboy — never buffers entire file in memory.
@@ -43,6 +43,7 @@ interface ParsedUpload {
   filePath: string;
   fileName: string;
   claudeApiKey: string;
+  provider: string;
   context: string;
 }
 
@@ -61,6 +62,7 @@ function parseMultipartStream(
     let filePath = '';
     let fileName = '';
     let claudeApiKey = '';
+    let provider = 'anthropic';
     let context = '';
     let fileReceived = false;
     let totalBytes = 0;
@@ -102,6 +104,7 @@ function parseMultipartStream(
     // Handle text fields
     busboy.on('field', (fieldname: string, val: string) => {
       if (fieldname === 'claudeApiKey') claudeApiKey = val;
+      if (fieldname === 'provider') provider = val;
       if (fieldname === 'context') context = val;
     });
 
@@ -110,7 +113,7 @@ function parseMultipartStream(
         reject(new Error('No file uploaded'));
         return;
       }
-      resolve({ filePath, fileName, claudeApiKey, context });
+      resolve({ filePath, fileName, claudeApiKey, provider, context });
     });
 
     busboy.on('error', (err: Error) => {
@@ -216,19 +219,7 @@ Use markdown formatting with headers, bullet points, tables, and emoji indicator
 Start with a brief executive summary of the app (what it does based on code analysis), 
 overall risk level (🟢 Low / 🟡 Medium / 🔴 High), and key statistics.
 
-## 📱 Phase 1 & 2: Page-by-Page Testing
-
-For each screen/view found in the code, analyze:
-- **Screen name** and purpose
-- **UI/UX issues** that could cause rejection
-- **Missing elements** (back buttons, loading states, error handling, empty states)
-- **Accessibility** concerns (VoiceOver, Dynamic Type, contrast)
-- **Crash risks** (force unwraps, unhandled optionals, missing nil checks)
-- **Layout issues** (safe area, notch handling, different device sizes)
-
-Use a table format per screen with columns: Issue | Severity | Guideline | Recommendation
-
-## 🔍 Phase 3: App Store Policy Compliance Checks
+## 🔍 Phase 1 : App Store Policy Compliance Checks or Android Playstore Checks
 
 Check against these Apple guidelines and flag violations:
 
@@ -273,7 +264,7 @@ For each check, indicate:
 - ❌ FAIL — likely rejection risk
 - ℹ️ NOT APPLICABLE — feature not used
 
-## 🛠️ Phase 4: Action/Remediation Plan
+## 🛠️ Phase 2: Action/Remediation Plan
 
 Provide a prioritized action plan with:
 
@@ -311,10 +302,10 @@ export async function POST(req: NextRequest) {
 
     // Stream-parse the multipart upload — writes file directly to disk
     // without ever loading the full file into memory
-    const { filePath, fileName, claudeApiKey, context } = await parseMultipartStream(req, tempDir);
+    const { filePath, fileName, claudeApiKey, provider, context } = await parseMultipartStream(req, tempDir);
 
     if (!claudeApiKey || !claudeApiKey.trim()) {
-      return NextResponse.json({ error: 'Claude API key is required' }, { status: 400 });
+      return NextResponse.json({ error: 'API key is required' }, { status: 400 });
     }
 
     // Extract if it's a zip/ipa
@@ -349,25 +340,51 @@ export async function POST(req: NextRequest) {
     // Build the audit prompt
     const auditPrompt = buildAuditPrompt(files, context);
 
-    // Call Claude API with streaming
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': claudeApiKey.trim(),
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+    // Call AI API with streaming
+    let apiUrl = '';
+    let headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    let payload: any = {};
+
+    if (provider === 'anthropic') {
+      apiUrl = 'https://api.anthropic.com/v1/messages';
+      headers['x-api-key'] = claudeApiKey.trim();
+      headers['anthropic-version'] = '2023-06-01';
+      headers['anthropic-beta'] = 'max-tokens-3-5-sonnet-2024-07-15';
+      payload = {
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 8192,
         stream: true,
-        messages: [
-          {
-            role: 'user',
-            content: auditPrompt,
-          },
-        ],
-      }),
+        messages: [{ role: 'user', content: auditPrompt }],
+      };
+    } else if (provider.startsWith('gemini')) {
+      const modelId = provider === 'gemini-pro' ? 'gemini-1.5-pro' : 'gemini-2.5-flash';
+      apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:streamGenerateContent?key=${claudeApiKey.trim()}&alt=sse`;
+      payload = {
+        contents: [{ role: 'user', parts: [{ text: auditPrompt }] }],
+        generationConfig: { maxOutputTokens: 8192 },
+      };
+    } else {
+      // OpenAI or OpenRouter (Both use identical Chat Completions API format)
+      apiUrl = provider === 'openrouter' ? 'https://openrouter.ai/api/v1/chat/completions' : 'https://api.openai.com/v1/chat/completions';
+      headers['Authorization'] = `Bearer ${claudeApiKey.trim()}`;
+      if (provider === 'openrouter') {
+        headers['HTTP-Referer'] = 'https://gracias.sh'; // Optional, but good practice for OpenRouter
+        headers['X-Title'] = 'App Store Compliance Auditor';
+      }
+      payload = {
+        model: provider === 'openrouter' ? 'anthropic/claude-3.5-sonnet' : 'gpt-4o',
+        max_tokens: 16384,
+        stream: true,
+        messages: [{ role: 'user', content: auditPrompt }],
+      };
+    }
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
@@ -377,7 +394,7 @@ export async function POST(req: NextRequest) {
       try {
         const parsed = JSON.parse(errorBody);
         errorMessage = parsed.error?.message || errorMessage;
-      } catch {}
+      } catch { }
       return NextResponse.json({ error: errorMessage }, { status: response.status });
     }
 
@@ -412,10 +429,30 @@ export async function POST(req: NextRequest) {
 
                 try {
                   const parsed = JSON.parse(data);
-                  if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+                  let textFragment = '';
+
+                  if (provider === 'anthropic') {
+                    if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+                      textFragment = parsed.delta.text;
+                    }
+                  } else if (provider.startsWith('gemini')) {
+                    if (parsed.candidates && parsed.candidates.length > 0) {
+                      const parts = parsed.candidates[0].content?.parts;
+                      if (parts && parts.length > 0 && parts[0].text) {
+                        textFragment = parts[0].text;
+                      }
+                    }
+                  } else {
+                    // OpenAI / OpenRouter format
+                    if (parsed.choices && parsed.choices.length > 0 && parsed.choices[0].delta?.content) {
+                      textFragment = parsed.choices[0].delta.content;
+                    }
+                  }
+
+                  if (textFragment) {
                     controller.enqueue(encoder.encode(JSON.stringify({
                       type: 'content',
-                      text: parsed.delta.text,
+                      text: textFragment,
                     }) + '\n'));
                   }
                 } catch {
@@ -434,7 +471,7 @@ export async function POST(req: NextRequest) {
           controller.close();
           // Clean up temp dir
           if (tempDir) {
-            fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+            fs.rm(tempDir, { recursive: true, force: true }).catch(() => { });
           }
         }
       },
@@ -451,7 +488,7 @@ export async function POST(req: NextRequest) {
     console.error('Audit API Error:', error);
     // Clean up temp dir on error
     if (tempDir) {
-      fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+      fs.rm(tempDir, { recursive: true, force: true }).catch(() => { });
     }
     return NextResponse.json(
       { error: error.message || 'Internal Server Error' },
