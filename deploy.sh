@@ -57,13 +57,14 @@ fi
 
 # ─── 5. Environment file ──────────────────────
 if [ ! -f "$APP_DIR/.env.local" ]; then
-    echo "==> [5/7] Creating .env.local..."
-    cat > "$APP_DIR/.env.local" << 'ENVEOF'
-MONGODB_URI=mongodb+srv://atharvajaynaik_db_user:Fuy2DMfoScGhOqLx@graciasai.3owqrsn.mongodb.net/
-ENVEOF
-    echo "    Created .env.local"
+    echo "==> [5/7] .env.local not found!"
+    echo "    Create it manually:"
+    echo "    echo 'MONGODB_URI=your_mongodb_uri_here' > $APP_DIR/.env.local"
+    echo ""
+    echo "    Then re-run this script."
+    exit 1
 else
-    echo "==> [5/7] .env.local already exists. Skipping."
+    echo "==> [5/7] .env.local exists. Skipping."
 fi
 
 # ─── 6. Build ─────────────────────────────────
