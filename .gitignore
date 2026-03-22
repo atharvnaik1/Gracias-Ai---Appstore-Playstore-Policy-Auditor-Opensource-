@@ -4,3 +4,4 @@ dist/
 .env
 .env.local
 .DS_Store
+deploy.local.sh
