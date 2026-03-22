@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const ReportSchema = new mongoose.Schema({
-  userId: { type: String, required: true },
+  userId: { type: String },
   reportContent: { type: String, required: true },
   filesScanned: { type: Number, required: true },
   createdAt: { type: Date, default: Date.now },

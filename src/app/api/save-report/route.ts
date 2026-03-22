@@ -1,27 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import mongoose from 'mongoose';
 import dbConnect from '../../../lib/mongodb';
 import { Report } from '../../../models/Report';
-import { auth } from '@clerk/nextjs/server';
+
+const MAX_REPORT_SIZE = 500_000; // 500KB max report content
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { reportContent, filesScanned } = await req.json();
 
     if (!reportContent || filesScanned === undefined) {
       return NextResponse.json({ error: 'Missing report data' }, { status: 400 });
     }
 
+    if (typeof reportContent !== 'string' || reportContent.length > MAX_REPORT_SIZE) {
+      return NextResponse.json({ error: 'Report content too large' }, { status: 400 });
+    }
+
     await dbConnect();
 
     const ReportModel = Report as any;
     const newReport = await ReportModel.create({
-      userId,
       reportContent,
       filesScanned
     });
