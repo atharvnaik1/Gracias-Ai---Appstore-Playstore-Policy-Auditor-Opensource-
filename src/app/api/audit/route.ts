@@ -56,6 +56,7 @@ interface ParsedUpload {
   provider: string;
   model: string;
   context: string;
+  fileId?: string;
 }
 
 function parseMultipartStream(
@@ -71,6 +72,7 @@ function parseMultipartStream(
     });
 
     let filePath = '';
+    let fileId = '';
     let fileName = '';
     let claudeApiKey = '';
     let provider = 'anthropic';
@@ -145,15 +147,21 @@ function parseMultipartStream(
       if (fieldname === 'provider') provider = val;
       if (fieldname === 'model') model = val;
       if (fieldname === 'context') context = val;
+      if (fieldname === 'fileId') fileId = val;
+      if (fieldname === 'fileName') fileName = val;
     });
 
     busboy.on('finish', () => {
-      if (!fileReceived) {
+      if (!fileReceived && !fileId) {
         safeReject(new Error('No file uploaded'));
         return;
       }
+      if (!fileReceived && fileId) {
+        filePath = path.join(os.tmpdir(), fileId, fileName);
+        fileReceived = true;
+        writeFinished = true;
+      }
       busboyFinished = true;
-      // If no file field was encountered (text-only), writeFinished stays false
       if (!filePath) {
         safeReject(new Error('No file uploaded'));
         return;
