@@ -109,8 +109,8 @@ export default function AuditPage() {
     const droppedFile = e.dataTransfer.files[0];
     if (droppedFile) {
       const ext = droppedFile.name.split('.').pop()?.toLowerCase();
-      if (ext !== 'ipa') {
-        setErrorMessage('Please upload an .ipa file');
+      if (ext !== 'ipa' && ext !== 'apk') {
+        setErrorMessage('Please upload an .ipa or .apk file');
       } else if (droppedFile.size > 150 * 1024 * 1024) {
         setErrorMessage('File exceeds maximum size of 150MB');
       } else {
@@ -124,8 +124,8 @@ export default function AuditPage() {
     const selected = e.target.files?.[0];
     if (selected) {
       const ext = selected.name.split('.').pop()?.toLowerCase();
-      if (ext !== 'ipa') {
-        setErrorMessage('Please upload an .ipa file');
+      if (ext !== 'ipa' && ext !== 'apk') {
+        setErrorMessage('Please upload an .ipa or .apk file');
         e.target.value = '';
         return;
       }
@@ -247,36 +247,50 @@ export default function AuditPage() {
     try {
       const html2pdf = (await import('html2pdf.js')).default;
 
-      // Build a wrapper with branded header + watermark + report content
+      // Build a wrapper with branded header + metadata + watermark + report content
       const wrapper = document.createElement('div');
-      wrapper.style.position = 'relative';
+      wrapper.id = 'gracias-ai-pdf-wrapper';
+      wrapper.style.position = 'absolute';
+      wrapper.style.left = '-9999px';
       wrapper.style.backgroundColor = '#ffffff';
-      wrapper.style.padding = '24px';
-      wrapper.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-      wrapper.style.color = '#1a1a1a';
+      wrapper.style.padding = '40px';
+      wrapper.style.fontFamily = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+      wrapper.style.color = '#111827';
       wrapper.style.width = '800px';
+      wrapper.style.lineHeight = '1.6';
 
-      // Branded header
+      // Branded header with enhanced professional metadata
       const header = document.createElement('div');
       header.style.borderBottom = '2px solid #7c3aed';
-      header.style.paddingBottom = '12px';
-      header.style.marginBottom = '20px';
+      header.style.paddingBottom = '20px';
+      header.style.marginBottom = '32px';
       header.style.display = 'flex';
       header.style.justifyContent = 'space-between';
-      header.style.alignItems = 'center';
+      header.style.alignItems = 'flex-start';
       header.innerHTML = `
-        <div style="display:flex;align-items:center;gap:10px;">
-          <div style="background:linear-gradient(135deg,#7c3aed,#3b82f6);width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;">
-            <span style="color:#fff;font-size:14px;font-weight:900;">G</span>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="background:linear-gradient(135deg,#7c3aed,#3b82f6);width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 6px -1px rgba(124,58,237,0.2);">
+              <span style="color:#fff;font-size:18px;font-weight:900;">G</span>
+            </div>
+            <div>
+              <div style="font-size:20px;font-weight:800;color:#111827;letter-spacing:-0.5px;">Gracias AI</div>
+              <div style="font-size:10px;color:#6b7280;letter-spacing:1.5px;text-transform:uppercase;font-weight:600;">Compliance Auditor</div>
+            </div>
           </div>
-          <div>
-            <div style="font-size:16px;font-weight:800;color:#000;">Gracias AI</div>
-            <div style="font-size:9px;color:#666;letter-spacing:1px;text-transform:uppercase;">App Store Compliance Auditor</div>
+          <div style="margin-top:16px;display:grid;grid-template-columns:auto auto;gap:x-24px;row-gap:4px;">
+            <div style="font-size:11px;color:#6b7280;">Audit Target:</div>
+            <div style="font-size:11px;color:#111827;font-weight:600;">${file?.name || 'Unknown Application'}</div>
+            <div style="font-size:11px;color:#6b7280;">Audit Date:</div>
+            <div style="font-size:11px;color:#111827;font-weight:600;">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+            <div style="font-size:11px;color:#6b7280;">Files Scanned:</div>
+            <div style="font-size:11px;color:#111827;font-weight:600;">${filesScanned} source files</div>
           </div>
         </div>
-        <div style="text-align:right;font-size:9px;color:#666;">
-          <div><a href="https://www.producthunt.com/posts/gracias-ai" style="color:#f97316;text-decoration:none;font-weight:600;">Product Hunt</a> &nbsp;|&nbsp; <a href="https://github.com/atharvnaik1/GraciasAi-Appstore-Policy-Auditor-Opensource" style="color:#666;text-decoration:none;">GitHub</a></div>
-          <div style="margin-top:2px;">business@gracias.sh</div>
+        <div style="text-align:right;display:flex;flex-direction:column;gap:4px;">
+          <div style="font-size:11px;color:#7c3aed;font-weight:700;">CONFIDENTIAL AUDIT</div>
+          <div style="font-size:10px;color:#6b7280;">business@gracias.sh</div>
+          <div style="font-size:10px;color:#6b7280;">opensource.gracias.sh</div>
         </div>
       `;
       wrapper.appendChild(header);
@@ -287,9 +301,9 @@ export default function AuditPage() {
       watermark.style.top = '50%';
       watermark.style.left = '50%';
       watermark.style.transform = 'translate(-50%, -50%) rotate(-35deg)';
-      watermark.style.fontSize = '80px';
+      watermark.style.fontSize = '120px';
       watermark.style.fontWeight = '900';
-      watermark.style.color = 'rgba(124, 58, 237, 0.04)';
+      watermark.style.color = 'rgba(124, 58, 237, 0.03)';
       watermark.style.pointerEvents = 'none';
       watermark.style.zIndex = '0';
       watermark.style.whiteSpace = 'nowrap';
@@ -302,30 +316,57 @@ export default function AuditPage() {
       clone.style.overflow = 'visible';
       clone.style.position = 'relative';
       clone.style.zIndex = '1';
+      clone.style.background = 'transparent';
+
+      // Inject PDF-specific CSS for high-quality Markdown rendering
+      const style = document.createElement('style');
+      style.textContent = `
+        #gracias-ai-pdf-wrapper h1 { font-size: 28px; margin-bottom: 24px; color: #111827; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; }
+        #gracias-ai-pdf-wrapper h2 { font-size: 20px; margin-top: 32px; margin-bottom: 16px; color: #111827; border-left: 4px solid #7c3aed; padding-left: 12px; }
+        #gracias-ai-pdf-wrapper h3 { font-size: 16px; margin-top: 24px; margin-bottom: 12px; color: #374151; font-weight: 700; }
+        #gracias-ai-pdf-wrapper p { margin-bottom: 12px; font-size: 13px; color: #4b5563; }
+        #gracias-ai-pdf-wrapper blockquote { border-left: 4px solid #e5e7eb; padding: 16px; margin: 16px 0; background: #f9fafb; border-radius: 8px; font-size: 13px; }
+        #gracias-ai-pdf-wrapper blockquote p { margin-bottom: 8px; }
+        #gracias-ai-pdf-wrapper blockquote p:last-child { margin-bottom: 0; }
+        #gracias-ai-pdf-wrapper table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 12px; }
+        #gracias-ai-pdf-wrapper th { background: #f3f4f6; color: #374151; text-align: left; padding: 10px; border: 1px solid #e5e7eb; font-weight: 700; }
+        #gracias-ai-pdf-wrapper td { padding: 10px; border: 1px solid #e5e7eb; color: #4b5563; vertical-align: top; }
+        #gracias-ai-pdf-wrapper code { font-family: ui-monospace, monospace; background: #f3f4f6; padding: 2px 4px; border-radius: 4px; font-size: 11px; color: #d63384; }
+        #gracias-ai-pdf-wrapper strong { color: #111827; font-weight: 700; }
+        #gracias-ai-pdf-wrapper hr { border: 0; border-top: 1px solid #e5e7eb; margin: 32px 0; }
+      `;
+      wrapper.appendChild(style);
+
+      // Clean up inline styles from the clone that might clash (Tailwind prose-invert, etc.)
+      clone.classList.remove('prose-invert');
       clone.querySelectorAll('*').forEach((el) => {
         const htmlEl = el as HTMLElement;
-        htmlEl.style.color = '#1a1a1a';
+        // Strip specific problematic dark-mode styles
         htmlEl.style.backgroundColor = 'transparent';
         htmlEl.style.backgroundImage = 'none';
+        htmlEl.style.color = ''; // Let the PDF CSS handle it
         htmlEl.style.webkitBackgroundClip = 'unset';
         htmlEl.style.webkitTextFillColor = 'unset';
-        htmlEl.style.borderColor = '#e5e5e5';
       });
-      clone.querySelectorAll('h1, h2, h3').forEach((el) => { (el as HTMLElement).style.color = '#000000'; });
-      clone.querySelectorAll('th').forEach((el) => { const h = el as HTMLElement; h.style.backgroundColor = '#f5f5f5'; h.style.color = '#000000'; });
-      clone.querySelectorAll('code').forEach((el) => { const h = el as HTMLElement; h.style.backgroundColor = '#f0f0f0'; h.style.color = '#d63384'; });
-      wrapper.appendChild(clone);
 
-      wrapper.style.position = 'absolute';
-      wrapper.style.left = '-9999px';
+      wrapper.appendChild(clone);
       document.body.appendChild(wrapper);
+
       await html2pdf().from(wrapper).set({
-        margin: 10,
-        filename: `gracias-ai-audit-report-${new Date().toISOString().slice(0, 10)}.pdf`,
-        image: { type: 'jpeg' as 'jpeg' | 'png' | 'webp', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0 },
-        jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as 'portrait' | 'landscape' },
-      } as any).save();
+        margin: [15, 10, 15, 10], // top, left, bottom, right
+        filename: `gracias-ai-audit-${file?.name?.replace(/\.[^/.]+$/, "") || 'report'}-${new Date().toISOString().slice(0, 10)}.pdf`,
+        image: { type: 'jpeg', quality: 1.0 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          letterRendering: true,
+          windowWidth: 800
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      }).save();
+
       document.body.removeChild(wrapper);
     } catch (err) {
       console.error('PDF export failed:', err);
@@ -560,7 +601,7 @@ export default function AuditPage() {
                         <input
                           ref={fileInputRef}
                           type="file"
-                          accept=".ipa"
+                          accept=".ipa,.apk"
                           onChange={handleFileSelect}
                           className="hidden"
                         />
@@ -591,10 +632,10 @@ export default function AuditPage() {
                                 <Upload className="w-7 h-7 text-muted-foreground group-hover:text-primary transition-colors" />
                               </div>
                               <p className="text-white font-semibold text-sm md:text-base mb-1">
-                                Drop your .ipa file here
+                                Drop your app file here
                               </p>
                               <p className="text-muted-foreground text-xs mb-3">
-                                <span className="text-primary">.ipa</span> files up to 150MB
+                                <span className="text-primary">.ipa</span> or <span className="text-blue-400">.apk</span> up to 150MB
                               </p>
                               <span className="text-[10px] text-muted-foreground/60 font-medium">
                                 .swift, .m, .plist, .entitlements, .storyboard &amp; more
