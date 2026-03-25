@@ -10,6 +10,7 @@ import {
   Zap, Lock, Code2, Clock, Apple, Cpu
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import Link from 'next/link';
 import { UserButton, SignedOut, SignedIn, useAuth, useClerk } from '@clerk/nextjs';
 
@@ -67,10 +68,21 @@ export default function AuditPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [showFileList, setShowFileList] = useState(false);
+  // Upload progress state
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadSpeed, setUploadSpeed] = useState(''); // e.g. '1.2 MB/s'
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedFileId, setUploadedFileId] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState('');
+  const [isAutoAnalyzing, setIsAutoAnalyzing] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const reportRef = useRef<HTMLDivElement>(null);
   const completeReportRef = useRef<HTMLDivElement>(null);
+  // Keep a ref to the latest handleRunAudit so useEffect can call it without going stale
+  const handleRunAuditRef = useRef<(() => void) | null>(null);
+  // Track the fileId that has already been auto-triggered to prevent double-runs
+  const autoTriggeredFileIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('claude_api_key');
@@ -89,6 +101,20 @@ export default function AuditPage() {
     if (claudeApiKey) localStorage.setItem('claude_api_key', claudeApiKey);
   }, [claudeApiKey]);
 
+  // Auto-start audit as soon as upload finishes
+  useEffect(() => {
+    if (
+      uploadedFileId &&
+      uploadedFileId !== autoTriggeredFileIdRef.current &&
+      handleRunAuditRef.current
+    ) {
+      autoTriggeredFileIdRef.current = uploadedFileId;
+      setIsAutoAnalyzing(true);
+      // Small delay so state settles before we start
+      setTimeout(() => handleRunAuditRef.current?.(), 300);
+    }
+  }, [uploadedFileId]);
+
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -100,6 +126,71 @@ export default function AuditPage() {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
+  }, []);
+
+  const startUpload = useCallback((picked: File) => {
+    setFile(picked);
+    setUploadedFileId(null);
+    setUploadProgress(0);
+    setUploadSpeed('');
+    setUploadError('');
+    setIsUploading(true);
+
+    const formData = new FormData();
+    formData.append('file', picked);
+
+    const xhr = new XMLHttpRequest();
+    let startTime = Date.now();
+    let lastLoaded = 0;
+
+    xhr.upload.addEventListener('progress', (e) => {
+      if (!e.lengthComputable) return;
+      const pct = Math.round((e.loaded / e.total) * 100);
+      setUploadProgress(pct);
+
+      const now = Date.now();
+      const elapsed = (now - startTime) / 1000; // seconds
+      if (elapsed > 0) {
+        const bytesSec = (e.loaded - lastLoaded) / ((now - startTime) / 1000);
+        // Use total bytes sent / elapsed for a smoother reading
+        const avgBytesPerSec = e.loaded / elapsed;
+        const mbps = avgBytesPerSec / (1024 * 1024);
+        if (mbps >= 1) {
+          setUploadSpeed(`${mbps.toFixed(1)} MB/s`);
+        } else {
+          setUploadSpeed(`${(avgBytesPerSec / 1024).toFixed(0)} KB/s`);
+        }
+        lastLoaded = e.loaded;
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      setIsUploading(false);
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          setUploadedFileId(data.fileId);
+          setUploadProgress(100);
+        } catch {
+          setUploadError('Upload response invalid.');
+        }
+      } else {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          setUploadError(data.error || 'Upload failed.');
+        } catch {
+          setUploadError('Upload failed.');
+        }
+      }
+    });
+
+    xhr.addEventListener('error', () => {
+      setIsUploading(false);
+      setUploadError('Upload failed. Check your connection.');
+    });
+
+    xhr.open('POST', '/api/upload');
+    xhr.send(formData);
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -114,11 +205,11 @@ export default function AuditPage() {
       } else if (droppedFile.size > 150 * 1024 * 1024) {
         setErrorMessage('File exceeds maximum size of 150MB');
       } else {
-        setFile(droppedFile);
         setErrorMessage('');
+        startUpload(droppedFile);
       }
     }
-  }, []);
+  }, [startUpload]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
@@ -134,8 +225,8 @@ export default function AuditPage() {
         e.target.value = '';
         return;
       }
-      setFile(selected);
       setErrorMessage('');
+      startUpload(selected);
     }
     e.target.value = '';
   };
@@ -150,28 +241,54 @@ export default function AuditPage() {
   const { openSignIn, openSignUp } = useClerk();
 
   const handleRunAudit = async () => {
-    if (!file || !claudeApiKey.trim()) return;
+    if (!file || !claudeApiKey.trim()) {
+      // If upload just finished but API key is missing, show helpful message
+      if (file && !claudeApiKey.trim()) {
+        setErrorMessage('Enter your API key to start analysis.');
+      }
+      return;
+    }
+    if (isUploading) { setErrorMessage('Please wait for the file upload to complete.'); return; }
+    if (uploadError) { setErrorMessage('Upload failed. Please re-select your file.'); return; }
 
+    // Sign-in check only here, not on page load
     if (!isSignedIn) {
       openSignIn();
       return;
     }
-    setPhase('uploading');
+
+    setPhase('analyzing');
     setReportContent('');
     setErrorMessage('');
     setFilesScanned(0);
     setFileNames([]);
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('claudeApiKey', claudeApiKey.trim());
-    formData.append('provider', provider);
-    formData.append('model', model);
-    formData.append('context', context);
-
     try {
-      setPhase('analyzing');
-      const response = await fetch('/api/audit', { method: 'POST', body: formData });
+      let response: Response;
+
+      if (uploadedFileId) {
+        // File is already on server — send params only
+        const formData = new FormData();
+        formData.append('fileId', uploadedFileId);
+        formData.append('fileName', file.name);
+        formData.append('claudeApiKey', claudeApiKey.trim());
+        formData.append('provider', provider);
+        formData.append('model', model);
+        formData.append('context', context);
+        response = await fetch('/api/audit', { method: 'POST', body: formData });
+      } else {
+        // Fallback: upload + audit in one go
+        setPhase('uploading');
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('claudeApiKey', claudeApiKey.trim());
+        formData.append('provider', provider);
+        formData.append('model', model);
+        formData.append('context', context);
+        response = await fetch('/api/audit', { method: 'POST', body: formData });
+        setPhase('analyzing');
+      }
+
       if (!response.ok) {
         const errData = await response.json();
         throw new Error(errData.error || 'Audit request failed');
@@ -225,6 +342,9 @@ export default function AuditPage() {
     }
   };
 
+  // Keep ref in sync so useEffect auto-trigger always has fresh closure
+  handleRunAuditRef.current = handleRunAudit;
+
   const handleExportReport = () => {
     if (!reportContent) return;
     try {
@@ -243,140 +363,214 @@ export default function AuditPage() {
   };
 
   const handleExportPdf = async () => {
-    if (!reportContent || !completeReportRef.current) return;
+    if (!reportContent) return;
     try {
-      const html2pdf = (await import('html2pdf.js')).default;
+      const { marked } = await import('marked');
 
-      // Build a wrapper with branded header + watermark + report content
-      const wrapper = document.createElement('div');
-      wrapper.style.position = 'relative';
-      wrapper.style.backgroundColor = '#ffffff';
-      wrapper.style.padding = '24px';
-      wrapper.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-      wrapper.style.color = '#1a1a1a';
-      wrapper.style.width = '800px';
+      // Configure marked for GFM (tables, strikethrough, etc.)
+      marked.setOptions({ gfm: true, breaks: true } as any);
 
-      // Branded header
-      const header = document.createElement('div');
-      header.style.borderBottom = '2px solid #7c3aed';
-      header.style.paddingBottom = '12px';
-      header.style.marginBottom = '20px';
-      header.style.display = 'flex';
-      header.style.justifyContent = 'space-between';
-      header.style.alignItems = 'center';
-      header.innerHTML = `
-        <div style="display:flex;align-items:center;gap:10px;">
-          <div style="background:linear-gradient(135deg,#7c3aed,#3b82f6);width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;">
-            <span style="color:#fff;font-size:14px;font-weight:900;">G</span>
-          </div>
-          <div>
-            <div style="font-size:16px;font-weight:800;color:#000;">Gracias AI</div>
-            <div style="font-size:9px;color:#666;letter-spacing:1px;text-transform:uppercase;">App Store Compliance Auditor</div>
-          </div>
-        </div>
-        <div style="text-align:right;font-size:9px;color:#666;">
-          <div><a href="https://www.producthunt.com/posts/gracias-ai" style="color:#f97316;text-decoration:none;font-weight:600;">Product Hunt</a> &nbsp;|&nbsp; <a href="https://github.com/atharvnaik1/GraciasAi-Appstore-Policy-Auditor-Opensource" style="color:#666;text-decoration:none;">GitHub</a></div>
-          <div style="margin-top:2px;">business@gracias.sh</div>
-        </div>
-      `;
-      wrapper.appendChild(header);
+      const bodyHtml = await marked.parse(reportContent);
+      const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
-      // Watermark
-      const watermark = document.createElement('div');
-      watermark.style.position = 'fixed';
-      watermark.style.top = '50%';
-      watermark.style.left = '50%';
-      watermark.style.transform = 'translate(-50%, -50%) rotate(-35deg)';
-      watermark.style.fontSize = '80px';
-      watermark.style.fontWeight = '900';
-      watermark.style.color = 'rgba(124, 58, 237, 0.04)';
-      watermark.style.pointerEvents = 'none';
-      watermark.style.zIndex = '0';
-      watermark.style.whiteSpace = 'nowrap';
-      watermark.textContent = 'Gracias AI';
-      wrapper.appendChild(watermark);
+      const fullHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gracias AI — App Store Compliance Report</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 13px;
+      line-height: 1.7;
+      color: #1a1a2e;
+      background: #fff;
+      padding: 32px 40px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
 
-      // Clone report content
-      const clone = completeReportRef.current.cloneNode(true) as HTMLElement;
-      clone.style.maxHeight = 'none';
-      clone.style.overflow = 'visible';
-      clone.style.position = 'relative';
-      clone.style.zIndex = '1';
-      clone.querySelectorAll('*').forEach((el) => {
-        const htmlEl = el as HTMLElement;
-        htmlEl.style.color = '#1a1a1a';
-        htmlEl.style.backgroundColor = 'transparent';
-        htmlEl.style.backgroundImage = 'none';
-        htmlEl.style.webkitBackgroundClip = 'unset';
-        htmlEl.style.webkitTextFillColor = 'unset';
-        htmlEl.style.borderColor = '#e5e5e5';
-      });
-      clone.querySelectorAll('h1, h2, h3').forEach((el) => { (el as HTMLElement).style.color = '#000000'; });
-      clone.querySelectorAll('th').forEach((el) => { const h = el as HTMLElement; h.style.backgroundColor = '#f5f5f5'; h.style.color = '#000000'; });
-      clone.querySelectorAll('code').forEach((el) => { const h = el as HTMLElement; h.style.backgroundColor = '#f0f0f0'; h.style.color = '#d63384'; });
-      wrapper.appendChild(clone);
+    /* ── Header ─────────────────────────────────── */
+    .report-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #7c3aed;
+      padding-bottom: 14px;
+      margin-bottom: 28px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-logo {
+      background: linear-gradient(135deg, #7c3aed, #3b82f6);
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 15px; font-weight: 900;
+    }
+    .brand-name { font-size: 17px; font-weight: 800; color: #000; }
+    .brand-sub { font-size: 9px; color: #777; letter-spacing: 1.2px; text-transform: uppercase; margin-top: 1px; }
+    .meta { text-align: right; font-size: 9px; color: #777; }
+    .meta a { color: #7c3aed; text-decoration: none; font-weight: 600; }
 
-      wrapper.style.position = 'absolute';
-      wrapper.style.left = '-9999px';
-      document.body.appendChild(wrapper);
-      await html2pdf().from(wrapper).set({
-        margin: 10,
-        filename: `gracias-ai-audit-report-${new Date().toISOString().slice(0, 10)}.pdf`,
-        image: { type: 'jpeg' as 'jpeg' | 'png' | 'webp', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0 },
-        jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as 'portrait' | 'landscape' },
-      } as any).save();
-      document.body.removeChild(wrapper);
+    /* ── Typography ─────────────────────────────── */
+    h1 { font-size: 22px; font-weight: 900; color: #0f0f1a; margin: 24px 0 12px; border-bottom: 1px solid #e5e5f0; padding-bottom: 8px; }
+    h2 { font-size: 17px; font-weight: 800; color: #0f0f1a; margin: 28px 0 10px; border-bottom: 1px solid #eee; padding-bottom: 6px; }
+    h3 { font-size: 14px; font-weight: 700; color: #1a1a2e; margin: 18px 0 8px; }
+    h4, h5, h6 { font-size: 13px; font-weight: 700; color: #1a1a2e; margin: 12px 0 6px; }
+    p  { margin: 8px 0; color: #333; }
+    ul { margin: 8px 0 8px 20px; }
+    ol { margin: 8px 0 8px 4px; list-style: none; counter-reset: item; }
+    ol li { counter-increment: item; display: flex; align-items: flex-start; gap: 10px; margin: 6px 0;
+            padding: 8px 12px; border: 1px solid #ede9fe; border-radius: 8px; background: #faf8ff; }
+    ol li::before {
+      content: counter(item);
+      min-width: 22px; height: 22px; border-radius: 50%;
+      background: #7c3aed; color: #fff;
+      font-size: 10px; font-weight: 900;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 1px;
+    }
+    ul li { margin: 4px 0; color: #444; }
+    li > p { margin: 0; }
+    strong { font-weight: 700; color: #0f0f1a; }
+    em { font-style: italic; }
+    a { color: #7c3aed; text-decoration: none; }
+    code {
+      font-family: "SF Mono", "Fira Code", Consolas, monospace;
+      font-size: 11px;
+      background: #f3f0ff;
+      color: #7c3aed;
+      padding: 2px 5px;
+      border-radius: 4px;
+      border: 1px solid #e9e5ff;
+    }
+    pre { background: #f8f8f8; border: 1px solid #e5e5e5; border-radius: 8px; padding: 14px; overflow-x: auto; margin: 12px 0; }
+    pre code { background: none; border: none; padding: 0; color: #333; }
+    blockquote {
+      border-left: 3px solid #7c3aed;
+      background: #faf8ff;
+      margin: 12px 0;
+      padding: 10px 16px;
+      border-radius: 0 8px 8px 0;
+      color: #444;
+    }
+    blockquote p { margin: 3px 0; }
+    hr { border: none; border-top: 1px solid #eee; margin: 20px 0; }
+
+    /* ── Tables ─────────────────────────────────── */
+    table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 12px; border-radius: 8px; overflow: hidden; border: 1px solid #e5e5f0; }
+    thead { background: #f3f0ff; }
+    th { padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #555; border-bottom: 1px solid #e0ddf8; }
+    td { padding: 9px 12px; border-bottom: 1px solid #f0eeff; color: #333; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:nth-child(even) td { background: #fdfcff; }
+
+    /* ── Severity Badges ────────────────────────── */
+    td:has(span.badge) { padding: 7px 12px; }
+    /* Inject badges via JS below */
+
+    /* ── Watermark ──────────────────────────────── */
+    .watermark {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%, -50%) rotate(-30deg);
+      font-size: 90px; font-weight: 900;
+      color: rgba(124, 58, 237, 0.04);
+      pointer-events: none; white-space: nowrap; z-index: 0;
+    }
+
+    /* ── Footer ─────────────────────────────────── */
+    .report-footer {
+      margin-top: 36px; padding-top: 14px;
+      border-top: 1px solid #eee;
+      display: flex; justify-content: space-between;
+      font-size: 9px; color: #aaa;
+    }
+
+    @media print {
+      body { padding: 20px 24px; }
+      .no-print { display: none !important; }
+      @page { margin: 16mm 14mm; size: A4; }
+    }
+  </style>
+</head>
+<body>
+  <div class="watermark">Gracias AI</div>
+
+  <div class="report-header">
+    <div class="brand">
+      <div class="brand-logo">G</div>
+      <div>
+        <div class="brand-name">Gracias AI</div>
+        <div class="brand-sub">App Store Compliance Auditor</div>
+      </div>
+    </div>
+    <div class="meta">
+      <div>${dateStr}</div>
+      <div style="margin-top:3px;">
+        <a href="https://gracias.sh">gracias.sh</a> &nbsp;|&nbsp;
+        <a href="mailto:business@gracias.sh">business@gracias.sh</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="report-body">
+    ${bodyHtml}
+  </div>
+
+  <div class="report-footer">
+    <span>Generated by Gracias AI &mdash; App Store Compliance Auditor</span>
+    <span>gracias.sh &nbsp;|&nbsp; business@gracias.sh</span>
+  </div>
+
+  <script>
+    // Colour-code severity cells
+    document.querySelectorAll('td').forEach(function(td) {
+      var t = td.textContent.trim();
+      var map = {
+        'CRITICAL': 'background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;',
+        'HIGH':     'background:#ffedd5;color:#c2410c;border:1px solid #fed7aa;',
+        'MEDIUM':   'background:#fefce8;color:#a16207;border:1px solid #fde68a;',
+        'LOW':      'background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;',
+        'PASS':     'background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;',
+        'WARN':     'background:#fffbeb;color:#b45309;border:1px solid #fde68a;',
+        'FAIL':     'background:#fef2f2;color:#dc2626;border:1px solid #fecaca;',
+        'N/A':      'background:#f9fafb;color:#6b7280;border:1px solid #e5e7eb;',
+      };
+      if (map[t]) {
+        td.innerHTML = '<span style="display:inline-flex;align-items:center;padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700;' + map[t] + '">' + t + '</span>';
+      }
+    });
+    window.onload = function() { window.print(); };
+  </script>
+</body>
+</html>`;
+
+      const blob = new Blob([fullHtml], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const printWin = window.open(url, '_blank', 'width=900,height=700');
+      if (!printWin) {
+        // Fallback: direct download of HTML if popup blocked
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `gracias-ai-audit-report-${new Date().toISOString().slice(0, 10)}.html`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
     } catch (err) {
       console.error('PDF export failed:', err);
-      setErrorMessage('Failed to export PDF report');
+      setErrorMessage('Failed to export report. Please try the Markdown export instead.');
     }
   };
 
-  const isReady = file && claudeApiKey.trim();
+  const isReady = file && claudeApiKey.trim() && !isUploading && !uploadError;
 
   return (
     <main className="min-h-[100dvh] w-full bg-background text-foreground selection:bg-primary/30 relative overflow-hidden font-sans">
-      {/* Full-Screen Auth Gate */}
-      <SignedOut>
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-3xl">
-          <div className="absolute inset-0 pointer-events-none overflow-hidden">
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:40px_40px]" />
-            <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.08, 0.18, 0.08] }} transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }} className="absolute top-[-20%] left-[-10%] w-[700px] h-[700px] bg-primary/25 rounded-full blur-[200px]" />
-            <motion.div animate={{ scale: [1, 1.4, 1], opacity: [0.06, 0.14, 0.06] }} transition={{ duration: 14, repeat: Infinity, ease: "easeInOut", delay: 3 }} className="absolute bottom-[-20%] right-[-10%] w-[800px] h-[800px] bg-blue-600/20 rounded-full blur-[200px]" />
-            <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.04, 0.1, 0.04] }} transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 5 }} className="absolute top-[30%] left-[40%] w-[500px] h-[500px] bg-violet-500/15 rounded-full blur-[180px]" />
-            <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] via-transparent to-white/[0.01]" />
-          </div>
-          <div className="relative z-10 flex flex-col items-center w-full max-w-md px-4">
-            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="flex flex-col items-center mb-10">
-              <div className="bg-gradient-to-br from-primary to-blue-500 w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg shadow-primary/30 ring-1 ring-white/10 mb-5">
-                <Apple className="w-8 h-8 text-white" />
-              </div>
-              <h1 className="text-3xl md:text-4xl font-black text-white mb-3">Gracias AI</h1>
-              <p className="text-white/60 text-sm md:text-base text-center leading-relaxed max-w-xs">AI-Powered App Store Compliance Auditor</p>
-            </motion.div>
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.15 }} className="w-full rounded-3xl bg-white/[0.04] border border-white/[0.08] shadow-2xl shadow-black/40 backdrop-blur-2xl p-8 md:p-10">
-              <h2 className="text-white text-lg font-bold text-center mb-2">Welcome back</h2>
-              <p className="text-white/50 text-sm text-center mb-8">Sign in to start auditing your apps</p>
-              <button onClick={() => openSignIn()} className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-primary to-blue-600 text-white font-bold text-sm shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
-                <Lock className="w-4 h-4" /> Sign In
-              </button>
-              <div className="flex items-center gap-3 my-6">
-                <div className="flex-1 h-px bg-white/[0.08]" />
-                <span className="text-white/30 text-xs font-medium">OR</span>
-                <div className="flex-1 h-px bg-white/[0.08]" />
-              </div>
-              <button onClick={() => openSignUp()} className="w-full py-3.5 rounded-2xl bg-white/[0.06] border border-white/[0.1] text-white font-bold text-sm hover:bg-white/[0.1] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
-                <Sparkles className="w-4 h-4 text-blue-400" /> Create Account
-              </button>
-            </motion.div>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35 }} className="mt-8 flex items-center justify-center gap-5 text-xs">
-              <span className="flex items-center gap-1.5 text-white/40"><Lock className="w-3 h-3 text-green-400/70" /> Zero data storage</span>
-              <span className="flex items-center gap-1.5 text-white/40"><Code2 className="w-3 h-3 text-blue-400/70" /> Open source</span>
-            </motion.div>
-          </div>
-        </div>
-      </SignedOut>
+      {/* No full-screen auth gate — sign-in is only triggered on audit button click */}
 
       {/* Animated Background */}
       <div className="fixed inset-0 pointer-events-none z-0">
@@ -420,27 +614,32 @@ export default function AuditPage() {
             </div>
           </Link>
 
-          <nav className="hidden lg:flex items-center gap-1">
-            {['About', 'How it Works', 'Security'].map((item) => (
-              <a key={item} href={`#${item.toLowerCase().replace(/\s+/g, '-')}`}
-                className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-white hover:bg-white/5 rounded-lg transition-all">
-                {item}
-              </a>
-            ))}
+          <nav className="hidden lg:flex items-center gap-6">
+            <a href="https://www.producthunt.com/products/gracias-ai-opensource?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-gracias-ai-opensource" target="_blank" rel="noopener noreferrer" className="hover:opacity-90 transition-opacity">
+              <img alt="Gracias AI Opensource - Ai agent to fasten up iOS app publishing| Audit all policies | Product Hunt" style={{ width: 250, height: 54 }} width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1104589&theme=light&t=1774276122946" />
+            </a>
+            <div className="flex items-center gap-1">
+              {['About', 'How it Works', 'Security'].map((item) => (
+                <a key={item} href={`#${item.toLowerCase().replace(/\s+/g, '-')}`}
+                  className="px-3 py-2 text-sm font-medium text-muted-foreground hover:text-white hover:bg-white/5 rounded-lg transition-all">
+                  {item}
+                </a>
+              ))}
+            </div>
           </nav>
 
           <div className="flex items-center gap-2 md:gap-3">
             <Link
               href="https://github.com/atharvnaik1/GraciasAi-Appstore-Policy-Auditor-Opensource"
               target="_blank"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-white transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 text-xs font-bold text-green-400 transition-all shadow-[0_0_15px_rgba(34,197,94,0.15)]"
             >
               <Github className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">GitHub</span>
+              <span className="hidden sm:inline">Star on GitHub</span>
               {starCount !== null && starCount > 0 && (
                 <>
-                  <Star className="w-3 h-3 text-yellow-400" />
-                  <span className="text-yellow-400">{starCount.toLocaleString()}</span>
+                  <Star className="w-3 h-3 text-yellow-500" />
+                  <span className="text-yellow-500">{starCount.toLocaleString()}</span>
                 </>
               )}
             </Link>
@@ -569,17 +768,49 @@ export default function AuditPage() {
                             <motion.div
                               initial={{ scale: 0.9, opacity: 0 }}
                               animate={{ scale: 1, opacity: 1 }}
-                              className="flex flex-col items-center gap-3"
+                              className="flex flex-col items-center gap-3 w-full"
                             >
-                              <div className="p-3 rounded-2xl bg-green-500/10 border border-green-500/20">
-                                <FileArchive className="w-8 h-8 text-green-400" />
+                              <div className={`p-3 rounded-2xl border ${isUploading ? 'bg-primary/10 border-primary/20' : uploadError ? 'bg-red-500/10 border-red-500/20' : 'bg-green-500/10 border-green-500/20'}`}>
+                                {isUploading
+                                  ? <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                                  : uploadError
+                                    ? <AlertTriangle className="w-8 h-8 text-red-400" />
+                                    : <FileArchive className="w-8 h-8 text-green-400" />
+                                }
                               </div>
-                              <div>
-                                <p className="text-white font-semibold text-sm md:text-base break-all line-clamp-1 max-w-[280px]">{file.name}</p>
+                              <div className="w-full">
+                                <p className="text-white font-semibold text-sm md:text-base break-all line-clamp-1 max-w-[280px] mx-auto">{file.name}</p>
                                 <p className="text-muted-foreground text-xs mt-1">{formatFileSize(file.size)}</p>
                               </div>
+                              {isUploading && (
+                                <div className="w-full max-w-[240px] space-y-1.5">
+                                  <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+                                    <motion.div
+                                      className="h-full rounded-full bg-gradient-to-r from-primary to-blue-500"
+                                      initial={{ width: '0%' }}
+                                      animate={{ width: `${uploadProgress}%` }}
+                                      transition={{ ease: 'linear', duration: 0.3 }}
+                                    />
+                                  </div>
+                                  <div className="flex justify-between items-center text-[10px]">
+                                    <span className="text-primary font-bold">{uploadProgress}%</span>
+                                    {uploadSpeed && <span className="text-muted-foreground">{uploadSpeed}</span>}
+                                  </div>
+                                </div>
+                              )}
+                              {uploadError && (
+                                <p className="text-red-400 text-[10px] text-center max-w-[220px]">{uploadError}</p>
+                              )}
+                              {!isUploading && !uploadError && uploadedFileId && (
+                                <span className={`text-[10px] font-semibold flex items-center gap-1 ${isAutoAnalyzing ? 'text-primary' : 'text-green-400'}`}>
+                                  {isAutoAnalyzing
+                                    ? <><Loader2 className="w-3 h-3 animate-spin" /> Analyzing your code…</>
+                                    : <><CheckCircle className="w-3 h-3" /> Upload complete — starting analysis</>
+                                  }
+                                </span>
+                              )}
                               <button
-                                onClick={(e) => { e.stopPropagation(); setFile(null); }}
+                                onClick={(e) => { e.stopPropagation(); setFile(null); setUploadedFileId(null); setUploadProgress(0); setUploadSpeed(''); setUploadError(''); setIsUploading(false); setIsAutoAnalyzing(false); autoTriggeredFileIdRef.current = null; }}
                                 className="px-3 py-1.5 text-xs font-medium text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-lg transition-all flex items-center gap-1.5"
                               >
                                 <XCircle className="w-3.5 h-3.5" /> Remove
@@ -700,19 +931,21 @@ export default function AuditPage() {
                     )}
                   </AnimatePresence>
 
-                  {/* Submit */}
+                   {/* Submit */}
                   <div className="mt-6">
                     <button
                       onClick={handleRunAudit}
-                      disabled={!isReady}
+                      disabled={!isReady || isUploading}
                       className={`relative w-full py-3.5 md:py-4 rounded-2xl font-bold text-sm md:text-base flex items-center justify-center gap-2.5 transition-all duration-300 overflow-hidden ${
-                        isReady
+                        isReady && !isUploading
                           ? 'bg-gradient-to-r from-primary to-blue-600 text-white shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:scale-[1.01] active:scale-[0.99]'
                           : 'bg-white/5 text-muted-foreground/50 cursor-not-allowed border border-white/5'
                       }`}
                     >
-                      <ShieldCheck className="w-5 h-5" />
-                      Run Compliance Audit
+                      {isUploading
+                        ? <><Loader2 className="w-5 h-5 animate-spin" /> Uploading… {uploadProgress}%</>
+                        : <><ShieldCheck className="w-5 h-5" /> Run Compliance Audit</>
+                      }
                     </button>
                   </div>
                 </div>
@@ -1014,7 +1247,7 @@ export default function AuditPage() {
                   </div>
                   <div ref={reportRef} className="p-5 md:p-8 max-h-[400px] overflow-y-auto custom-scrollbar bg-black/20">
                     <div className="prose prose-invert max-w-none text-xs md:text-sm leading-relaxed">
-                      <ReactMarkdown>{reportContent}</ReactMarkdown>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{reportContent}</ReactMarkdown>
                     </div>
                   </div>
                 </motion.div>
@@ -1095,7 +1328,88 @@ export default function AuditPage() {
 
                 <div className="p-5 md:p-10 overflow-y-auto max-h-[75vh] custom-scrollbar">
                   <div ref={completeReportRef} className="prose prose-invert max-w-none text-sm md:text-base leading-relaxed prose-headings:text-foreground prose-p:text-muted-foreground prose-p:leading-relaxed prose-li:text-muted-foreground prose-li:my-1 prose-strong:text-white prose-strong:font-bold prose-a:text-primary prose-a:transition-colors prose-code:text-primary prose-code:bg-primary/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:font-mono prose-code:text-xs prose-code:border prose-code:border-primary/20 prose-pre:bg-black/50 prose-pre:border prose-pre:border-white/10 prose-pre:rounded-xl prose-pre:p-4">
-                    <ReactMarkdown>{reportContent}</ReactMarkdown>
+                    <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          // ── Tables ───────────────────────────────────────
+                          table: ({ children }) => (
+                            <div className="overflow-x-auto my-6 rounded-xl border border-white/10 shadow-lg">
+                              <table className="w-full text-sm border-collapse">{children}</table>
+                            </div>
+                          ),
+                          thead: ({ children }) => (
+                            <thead className="bg-white/[0.06] border-b border-white/10">{children}</thead>
+                          ),
+                          tbody: ({ children }) => (
+                            <tbody className="divide-y divide-white/[0.05]">{children}</tbody>
+                          ),
+                          tr: ({ children }) => (
+                            <tr className="hover:bg-white/[0.03] transition-colors">{children}</tr>
+                          ),
+                          th: ({ children }) => (
+                            <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                              {children}
+                            </th>
+                          ),
+                          td: ({ children }) => {
+                            const text = String(children ?? '');
+                            // Severity badge colouring
+                            if (['CRITICAL','HIGH','MEDIUM','LOW'].includes(text.trim())) {
+                              const colours: Record<string, string> = {
+                                CRITICAL: 'bg-red-500/20 text-red-300 border-red-500/30',
+                                HIGH:     'bg-orange-500/20 text-orange-300 border-orange-500/30',
+                                MEDIUM:   'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
+                                LOW:      'bg-blue-500/20 text-blue-300 border-blue-500/30',
+                              };
+                              return (
+                                <td className="px-4 py-3">
+                                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold border ${colours[text.trim()]}`}>
+                                    {text.trim()}
+                                  </span>
+                                </td>
+                              );
+                            }
+                            return <td className="px-4 py-3 text-sm text-muted-foreground align-middle">{children}</td>;
+                          },
+                          // ── Ordered list — Phase 2 numbered items ────────
+                          ol: ({ children }) => (
+                            <ol className="my-4 space-y-3 list-none pl-0">{children}</ol>
+                          ),
+                          li: ({ children, ...props }) => {
+                            // Only style top-level items inside ol
+                            const ordered = (props as any).ordered ?? false;
+                            if (ordered) {
+                              const index = (props as any).index ?? 0;
+                              return (
+                                <li className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-white/10 transition-all">
+                                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 border border-primary/30 text-primary text-[10px] font-black flex items-center justify-center mt-0.5">
+                                    {index + 1}
+                                  </span>
+                                  <span className="text-sm text-muted-foreground leading-relaxed flex-1">{children}</span>
+                                </li>
+                              );
+                            }
+                            return <li className="text-sm text-muted-foreground leading-relaxed my-1.5 pl-1">{children}</li>;
+                          },
+                          // ── Blockquote ────────────────────────────────────
+                          blockquote: ({ children }) => (
+                            <blockquote className="my-4 pl-4 border-l-2 border-primary/40 bg-primary/5 rounded-r-xl py-3 pr-4 text-sm text-muted-foreground">
+                              {children}
+                            </blockquote>
+                          ),
+                          // ── Headings ──────────────────────────────────────
+                          h2: ({ children }) => (
+                            <h2 className="text-xl font-black text-white mt-10 mb-4 pb-2 border-b border-white/10 flex items-center gap-2">
+                              {children}
+                            </h2>
+                          ),
+                          h3: ({ children }) => (
+                            <h3 className="text-base font-bold text-white/90 mt-6 mb-3">{children}</h3>
+                          ),
+                        }}
+                      >
+                        {reportContent}
+                      </ReactMarkdown>
                   </div>
                 </div>
               </div>
