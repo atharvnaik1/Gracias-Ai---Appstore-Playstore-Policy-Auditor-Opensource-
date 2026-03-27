@@ -264,10 +264,17 @@ function sanitizeContext(context: string): string {
   return context.slice(0, 2000);
 }
 
+function addLineNumbers(content: string): string {
+  return content
+    .split('\n')
+    .map((line, i) => `${(i + 1).toString().padStart(4, ' ')} | ${line}`)
+    .join('\n');
+}
+
 function buildAuditPrompt(files: { path: string; content: string }[], context: string): { system: string; user: string } {
   let filesSummary = '';
   for (const file of files) {
-    filesSummary += `\n\n[FILE_START: ${file.path}]\n${file.content}\n[FILE_END: ${file.path}]`;
+    filesSummary += `\n\n[FILE_START: ${file.path}]\n${addLineNumbers(file.content)}\n[FILE_END: ${file.path}]`;
   }
 
   const safeContext = sanitizeContext(context);
@@ -283,6 +290,7 @@ Your task is to analyze source code files provided by the user and generate an A
 You MUST follow the exact markdown structure specified in the user's request. Every compliance check must use the blockquote format with STATUS, Guideline, Finding, File(s), and Action fields. The dashboard table must have accurate counts matching the checks below it.
 
 Quality requirements:
+- Source files include line numbers (format: "  42 | code"). Use these to cite findings as \`filename:42\` — do not guess line numbers
 - Every finding MUST cite specific file paths and line numbers from the provided code
 - Remediation steps must be concrete and actionable (e.g., "Add NSCameraUsageDescription to Info.plist" not "Update privacy settings")
 - Severity ratings must be calibrated: CRITICAL = guaranteed rejection, HIGH = likely rejection, MEDIUM = may cause rejection, LOW = improvement

@@ -366,18 +366,21 @@ export default function AuditPage() {
   const handleExportPdf = async () => {
     if (!reportContent || isExportingPdf) return;
     setIsExportingPdf(true);
+    let container: HTMLDivElement | null = null;
     try {
       const { marked } = await import('marked');
+      const DOMPurify = (await import('dompurify')).default;
       const html2canvas = (await import('html2canvas')).default;
       const { jsPDF } = await import('jspdf');
 
       marked.setOptions({ gfm: true, breaks: true } as any);
 
-      const bodyHtml = await marked.parse(reportContent);
+      const rawHtml = await marked.parse(reportContent);
+      const bodyHtml = DOMPurify.sanitize(rawHtml);
       const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
       // Create an off-screen container with print-friendly styles
-      const container = document.createElement('div');
+      container = document.createElement('div');
       container.style.cssText = 'position:absolute;left:-9999px;top:0;width:800px;background:#fff;';
       container.innerHTML = `
         <style>
@@ -525,13 +528,13 @@ export default function AuditPage() {
       }
 
       pdf.save(`gracias-ai-audit-report-${new Date().toISOString().slice(0, 10)}.pdf`);
-
-      // Cleanup
-      document.body.removeChild(container);
     } catch (err) {
       console.error('PDF export failed:', err);
       setErrorMessage('Failed to export PDF. Please try the Markdown export instead.');
     } finally {
+      if (container && container.parentNode) {
+        document.body.removeChild(container);
+      }
       setIsExportingPdf(false);
     }
   };
