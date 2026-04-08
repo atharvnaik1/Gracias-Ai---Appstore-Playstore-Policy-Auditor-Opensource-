@@ -289,6 +289,17 @@ ${filesSummary}
 
 Generate a thorough **Apple App Store Compliance Audit Report**. You MUST follow the exact structure below. Use markdown formatting precisely as shown.
 
+For each identified issue, include the following fields clearly:
+
+- Violation: (Yes/No)
+- Rule: (Specific App Store guideline)
+- Reason: (Why this is a violation based on code)
+- Severity: (Low / Medium / High)
+- Fix Suggestion: (Clear actionable step for developer)
+
+Ensure responses are concise, actionable, and easy to understand for developers.
+Avoid vague statements. Always provide specific references to code when possible.
+
 ---
 
 # App Store Compliance Audit Report
