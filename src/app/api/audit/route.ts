@@ -7,8 +7,13 @@ import { promisify } from 'util';
 import { Readable } from 'stream';
 import Busboy from 'busboy';
 import { LRUCache } from 'lru-cache';
-import { chunkTextByMeaning } from '../../../lib/textChunking';
-import { rankTextChunksByKeywordRelevance } from '../../../lib/chunkRanking';
+import {
+  createFileChunks,
+  rankChunks,
+  getPriorityChunks,
+  mergePriorityAndRankedChunks,
+  buildContext,
+} from '../../../utils/chunkUtils';
 
 const execFileAsync = promisify(execFile);
 
@@ -65,6 +70,52 @@ interface ParsedUpload {
   fileId?: string;
 }
 
+function sanitizeFileName(input: string): string {
+  const value = (input || '').trim();
+  if (!value) {
+    throw new Error('Invalid fileName');
+  }
+  if (value.includes('..') || value.includes('/') || value.includes('\\')) {
+    throw new Error('Invalid fileName');
+  }
+
+  const safeName = path.basename(value);
+  if (!safeName || safeName !== value) {
+    throw new Error('Invalid fileName');
+  }
+
+  return safeName;
+}
+
+function sanitizeFileId(input: string): string {
+  const value = (input || '').trim();
+  if (!value) {
+    throw new Error('Invalid fileId');
+  }
+  if (value.includes('..') || value.includes('/') || value.includes('\\')) {
+    throw new Error('Invalid fileId');
+  }
+
+  const safeId = path.basename(value);
+  if (!safeId || safeId !== value) {
+    throw new Error('Invalid fileId');
+  }
+
+  return safeId;
+}
+
+function buildSafePath(baseDir: string, ...segments: string[]): string {
+  const resolvedBase = path.resolve(baseDir);
+  const candidatePath = path.resolve(resolvedBase, ...segments);
+  const normalizedBase = resolvedBase.endsWith(path.sep) ? resolvedBase : `${resolvedBase}${path.sep}`;
+
+  if (!(candidatePath === resolvedBase || candidatePath.startsWith(normalizedBase))) {
+    throw new Error('Invalid file path');
+  }
+
+  return candidatePath;
+}
+
 function parseMultipartStream(
   req: NextRequest,
   tempDir: string
@@ -112,8 +163,8 @@ function parseMultipartStream(
         return;
       }
 
-      fileName = info.filename || 'upload.ipa';
-      filePath = path.join(tempDir, fileName);
+      fileName = sanitizeFileName(info.filename || 'upload.ipa');
+      filePath = buildSafePath(tempDir, fileName);
       fileReceived = true;
 
       const writeStream = createWriteStream(filePath);
@@ -163,7 +214,16 @@ function parseMultipartStream(
         return;
       }
       if (!fileReceived && fileId) {
-        filePath = path.join(os.tmpdir(), fileId, fileName);
+        try {
+          const safeFileId = sanitizeFileId(fileId);
+          const safeFileName = sanitizeFileName(fileName);
+          const uploadBaseDir = buildSafePath(os.tmpdir(), safeFileId);
+          filePath = buildSafePath(uploadBaseDir, safeFileName);
+          fileName = safeFileName;
+        } catch (err) {
+          safeReject(err as Error);
+          return;
+        }
         fileReceived = true;
         writeFinished = true;
       }
@@ -270,70 +330,8 @@ function sanitizeContext(context: string): string {
   return context.slice(0, 2000);
 }
 
-function isPriorityFilePath(filePath: string): boolean {
-  const normalized = filePath.toLowerCase();
-  return PRIORITY_FILE_PATTERNS.some((pattern) => normalized.endsWith(pattern.toLowerCase()));
-}
-
-function buildContextFromChunks(
-  finalChunks: { filePath: string; chunkText: string }[],
-  maxContextLength: number
-): string {
-  let finalContext = '';
-
-  for (const chunk of finalChunks) {
-    const block = `\nFILE: ${chunk.filePath}\n${chunk.chunkText}\n`;
-    if (finalContext.length + block.length > maxContextLength) {
-      break;
-    }
-    finalContext += block;
-  }
-
-  return finalContext;
-}
-
-function mergeChunksPriorityFirst(
-  priorityChunks: { filePath: string; chunkText: string }[],
-  topChunks: { filePath: string; chunkText: string }[],
-  maxChunks: number
-): { filePath: string; chunkText: string }[] {
-  const finalChunks: { filePath: string; chunkText: string }[] = [];
-  const seenChunkKeys = new Set<string>();
-
-  const addChunkIfUnique = (chunk: { filePath: string; chunkText: string }) => {
-    const key = `${chunk.filePath}\u0000${chunk.chunkText}`;
-    if (seenChunkKeys.has(key)) return;
-    if (finalChunks.length >= maxChunks) return;
-    seenChunkKeys.add(key);
-    finalChunks.push(chunk);
-  };
-
-  for (const chunk of priorityChunks) {
-    addChunkIfUnique(chunk);
-  }
-
-  for (const chunk of topChunks) {
-    addChunkIfUnique(chunk);
-    if (finalChunks.length >= maxChunks) break;
-  }
-
-  return finalChunks;
-}
-
 function buildAuditPrompt(files: { path: string; content: string }[], context: string): { system: string; user: string } {
-  const allChunks: { filePath: string; chunkText: string }[] = [];
-
-  for (const file of files) {
-    const chunks = chunkTextByMeaning(file.content, { minChars: 500, maxChars: 800 });
-    const chunksToUse = chunks.length > 0 ? chunks : [file.content];
-
-    for (const chunkText of chunksToUse) {
-      allChunks.push({
-        filePath: file.path,
-        chunkText,
-      });
-    }
-  }
+  const allChunks = createFileChunks(files, { minChars: 500, maxChars: 800 });
 
   const relevanceQuery = [
     'apple app store review guidelines compliance',
@@ -342,20 +340,16 @@ function buildAuditPrompt(files: { path: string; content: string }[], context: s
     context,
   ].filter(Boolean).join(' ');
 
-  const rankedChunks = rankTextChunksByKeywordRelevance(
-    allChunks,
-    relevanceQuery,
-    (chunk) => `${chunk.filePath} ${chunk.chunkText}`
-  );
+  const rankedChunks = rankChunks(allChunks, relevanceQuery);
 
   const topChunks = rankedChunks
     .slice(0, MAX_PROMPT_CHUNKS)
     .map((item) => item.chunk);
 
-  const priorityChunks = allChunks.filter((chunk) => isPriorityFilePath(chunk.filePath));
-  const finalChunks = mergeChunksPriorityFirst(priorityChunks, topChunks, MAX_FINAL_PROMPT_CHUNKS);
+  const priorityChunks = getPriorityChunks(allChunks, PRIORITY_FILE_PATTERNS);
+  const finalChunks = mergePriorityAndRankedChunks(priorityChunks, topChunks, MAX_FINAL_PROMPT_CHUNKS);
 
-  const contextText = buildContextFromChunks(finalChunks, MAX_PROMPT_CONTEXT_CHARS);
+  const contextText = buildContext(finalChunks, MAX_PROMPT_CONTEXT_CHARS);
 
   const safeContext = sanitizeContext(context);
 
