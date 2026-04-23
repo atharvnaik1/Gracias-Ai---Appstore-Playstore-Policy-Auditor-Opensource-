@@ -1,8 +1,8 @@
-# Gracias AI - App Store Compliance Auditor (Open Source)
+# ipaShip - App Store Compliance Auditor (Open Source)
 
 AI-powered iOS App Store compliance auditor. Upload your `.ipa` file and get a comprehensive audit against Apple's Review Guidelines — before you submit.
 
-**Live at: [opensource.gracias.sh](https://opensource.gracias.sh)**
+**Live at: [opensource.ipaship.com](https://opensource.ipaship.com)**
 
 ## Features
 
@@ -38,8 +38,8 @@ AI-powered iOS App Store compliance auditor. Upload your `.ipa` file and get a c
 
 ```bash
 # Clone the repo
-git clone https://github.com/atharvnaik1/Gracias-Ai---Appstore-Playstore-Policy-Auditor-Opensource-.git
-cd Gracias-Ai---Appstore-Playstore-Policy-Auditor-Opensource-
+git clone https://github.com/atharvnaik1/ipaShip-Ai---Appstore-Playstore-Policy-Auditor-Opensource-.git
+cd ipaShip-Ai---Appstore-Playstore-Policy-Auditor-Opensource-
 
 # Install dependencies
 npm install
@@ -75,13 +75,105 @@ npm start
 | `POST` | `/api/save-report` | Save report to MongoDB |
 | `GET` | `/api/visitor` | Increment and return visitor count |
 
+## Client Wrappers / SDKs
+
+ipaShip provides ready-to-use boilerplate SDKs and wrappers for various ecosystems and languages. You can find them in the `wrappers/` directory. Each wrapper is skeletoned to pragmatically audit your `.ipa` files directly from your CI/CD pipelines, backend backend, or build environments!
+
+### Commands to Run Wrappers
+
+Here are quick commands to interact with the given wrappers:
+
+**Node.js / NPM**
+```bash
+cd wrappers/npm && npm install
+node index.js
+```
+
+**Python**
+```bash
+cd wrappers/python
+python3 ipaship.py
+```
+
+**Rust**
+```bash
+cd wrappers/rust
+cargo run --release
+```
+
+**Go**
+```bash
+cd wrappers/go
+go run ipaship.go
+```
+
+**Homebrew (MacOS CLI)**
+```bash
+brew install ./wrappers/homebrew/ipaship.rb
+ipaship /path/to/app.ipa
+```
+
+**C / C++**
+```bash
+cd wrappers/c && gcc ipaship.c -o ipaship && ./ipaship
+cd wrappers/cpp && g++ ipaship.cpp -o ipaship && ./ipaship
+```
+
+**Java & Kotlin**
+```bash
+# Java
+cd wrappers/java && mvn clean install
+# Kotlin
+cd wrappers/kotlin && ./gradlew build
+```
+
+**Ruby**
+```bash
+cd wrappers/ruby
+gem build ipaship.gemspec
+```
+
+**PHP**
+```bash
+cd wrappers/php
+composer install
+```
+
+**C# / .NET**
+```bash
+cd wrappers/csharp-dotnet
+dotnet build
+```
+
+**R**
+```R
+# Load inside your R script (wrappers/r)
+source("R/ipaship.R")
+ipaship_audit("app.ipa", "API_KEY")
+```
+
+**Linux (Bash CLI)**
+```bash
+chmod +x wrappers/linux/ipaship-cli.sh
+./wrappers/linux/ipaship-cli.sh /path/to/app.ipa "YOUR_API_KEY"
+```
+
+**Swift & Apple Frameworks (Obj-C / Cocoapods)**
+- Add `wrappers/swift-cocoapods` as a local Swift Package Dependency.
+- Integrate the Objective-C headers from `wrappers/objc` into your build.
+
+**Cross-Platform App Frameworks (Dart/Flutter, Expo, Ionic)**
+- **Flutter:** Import `wrappers/flutter-dart` via local path dependency in your `pubspec.yaml`.
+- **Expo:** Integrate `wrappers/expo/index.js` as an Expo config plugin.
+- **Ionic:** Use the `wrappers/ionic` wrapper with Capacitor.
+
 ## Deployment
 
 A deployment script is included for Ubuntu 24.04 VMs:
 
 ```bash
 # On the server, create .env.local first
-echo 'MONGODB_URI=your_mongodb_uri_here' > /opt/gracias-ai/.env.local
+echo 'MONGODB_URI=your_mongodb_uri_here' > /opt/ipaship/.env.local
 
 # Then run the deploy script
 chmod +x deploy.sh
@@ -109,4 +201,5 @@ Open source. See repository for details.
 
 ---
 
-Built by [Gracias AI](https://gracias.sh)
+Built by [ipaShip](https://ipaship.com)
+© ipaShip – Original Creator: Atharv Naik

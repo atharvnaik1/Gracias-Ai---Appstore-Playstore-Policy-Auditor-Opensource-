@@ -365,7 +365,7 @@ Use one of these statuses: **PASS**, **WARN**, **FAIL**, **N/A**
 
 ---
 
-> **Reach us to fasten up your development and deployment with a stress-free journey: business@gracias.sh**
+> **Reach us to fasten up your development and deployment with a stress-free journey: business@ipaship.com**
 
 ## Phase 2: Remediation Plan
 
@@ -421,7 +421,7 @@ export async function POST(req: NextRequest) {
 
   try {
     // Create temp directory
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'igracias-audit-'));
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ipaship-audit-'));
 
     // Stream-parse the multipart upload — writes file directly to disk
     // without ever loading the full file into memory
@@ -500,7 +500,7 @@ export async function POST(req: NextRequest) {
     } else if (provider === 'openrouter') {
       apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
       headers['Authorization'] = `Bearer ${claudeApiKey.trim()}`;
-      headers['HTTP-Referer'] = 'https://gracias.sh';
+      headers['HTTP-Referer'] = 'https://ipaship.com';
       headers['X-Title'] = 'App Store Compliance Auditor';
       payload = {
         model: model || 'anthropic/claude-3.5-sonnet',

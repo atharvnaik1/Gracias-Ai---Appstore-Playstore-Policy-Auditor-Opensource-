@@ -8,7 +8,7 @@ const starsCache = new LRUCache<string, number>({
   ttl: 1000 * 60 * 5, // 5 minutes
 });
 
-const REPO = 'atharvnaik1/GraciasAi-Appstore-Policy-Auditor-Opensource';
+const REPO = 'async-atharv/ipaShip';
 const CACHE_KEY = 'stars';
 
 export async function GET() {

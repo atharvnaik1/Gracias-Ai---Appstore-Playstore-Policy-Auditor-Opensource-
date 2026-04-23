@@ -1,0 +1,8 @@
+{
+  "name": "ipaship-expo-plugin",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "expo": "~50.0.0"
+  }
+}

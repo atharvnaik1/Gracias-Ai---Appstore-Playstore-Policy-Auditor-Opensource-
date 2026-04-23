@@ -2,19 +2,19 @@
 set -euo pipefail
 
 # ============================================================
-# Gracias AI - Ubuntu 24.04 Deployment Script
+# ipaShip - Ubuntu 24.04 Deployment Script
 # Target: root@216.48.182.78
 # ============================================================
 
-APP_NAME="gracias-ai"
-APP_DIR="/opt/gracias-ai"
+APP_NAME="ipaship"
+APP_DIR="/opt/ipaship"
 NODE_MAJOR=20
 APP_PORT=3000
 SERVER_IP="216.48.182.78"
 
 echo ""
 echo "=========================================="
-echo "  Gracias AI - Deployment Script"
+echo "  ipaShip - Deployment Script"
 echo "=========================================="
 echo ""
 
@@ -51,7 +51,7 @@ if [ -d "$APP_DIR" ]; then
     git pull origin main
 else
     echo "    Cloning repository..."
-    git clone https://github.com/atharvnaik1/Gracias-Ai---Appstore-Playstore-Policy-Auditor-Opensource-.git "$APP_DIR"
+    git clone https://github.com/atharvnaik1/ipaShip-Ai---Appstore-Playstore-Policy-Auditor-Opensource-.git "$APP_DIR"
     cd "$APP_DIR"
 fi
 
@@ -85,7 +85,7 @@ pm2 startup systemd -u root --hp /root > /dev/null 2>&1 || true
 
 # ─── Nginx ─────────────────────────────────────
 echo "==> Configuring Nginx..."
-cat > /etc/nginx/sites-available/gracias-ai << NGINXEOF
+cat > /etc/nginx/sites-available/ipaship << NGINXEOF
 server {
     listen 80;
     server_name $SERVER_IP;
@@ -121,7 +121,7 @@ server {
 }
 NGINXEOF
 
-ln -sf /etc/nginx/sites-available/gracias-ai /etc/nginx/sites-enabled/gracias-ai
+ln -sf /etc/nginx/sites-available/ipaship /etc/nginx/sites-enabled/ipaship
 rm -f /etc/nginx/sites-enabled/default
 nginx -t 2>&1 | head -2
 systemctl enable nginx > /dev/null 2>&1

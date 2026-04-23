@@ -1,0 +1,13 @@
+{
+    "name": "ipaship/ipaship-php",
+    "description": "ipaShip PHP SDK",
+    "type": "library",
+    "require": {
+        "php": ">=7.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "IPAShip\\": "src/"
+        }
+    }
+}
