@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   let tempDir: string | null = null;
   
   try {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ipaship-upload-'));
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gracias-upload-'));
     
     const contentType = req.headers.get('content-type') || '';
     
