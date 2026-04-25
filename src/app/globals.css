@@ -101,7 +101,7 @@
   }
 
   .pdf-audit-table table {
-    @apply text-10px;
+    @apply text-[10px];
   }
 
   h2, h3 {

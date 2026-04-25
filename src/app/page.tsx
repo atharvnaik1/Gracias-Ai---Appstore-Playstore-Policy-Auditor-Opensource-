@@ -43,6 +43,10 @@ const providerModels: Record<string, { label: string; value: string }[]> = {
     { label: 'Llama 3.1 405B', value: 'meta-llama/llama-3.1-405b-instruct' },
     { label: 'Mixtral 8x22B', value: 'mistralai/mixtral-8x22b-instruct' },
   ],
+  ipaship: [
+    { label: 'ipaShip AI Core', value: 'meta/llama-3.1-405b-instruct' },
+    { label: 'ipaShip AI Fast', value: 'meta/llama-3.1-70b-instruct' },
+  ],
 };
 
 const selectStyle = {
@@ -54,9 +58,9 @@ const selectStyle = {
 
 export default function AuditPage() {
   const [file, setFile] = useState<File | null>(null);
-  const [claudeApiKey, setClaudeApiKey] = useState('');
-  const [provider, setProvider] = useState('anthropic');
-  const [model, setModel] = useState('claude-sonnet-4-20250514');
+  const [claudeApiKey, setClaudeApiKey] = useState('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');
+  const [provider, setProvider] = useState('ipaship');
+  const [model, setModel] = useState('meta/llama-3.1-405b-instruct');
   const [context, setContext] = useState('');
   const [phase, setPhase] = useState<AuditPhase>('idle');
   const [reportContent, setReportContent] = useState('');
@@ -854,6 +858,7 @@ export default function AuditPage() {
                           className="w-full bg-white/5 border border-white/10 text-xs text-white font-medium px-3 py-2.5 rounded-xl outline-none focus:ring-1 focus:ring-primary/50 appearance-none cursor-pointer hover:bg-white/[0.08] transition-colors"
                           style={selectStyle}
                         >
+                          <option value="ipaship">ipaShip AI</option>
                           <option value="anthropic">Anthropic (Claude)</option>
                           <option value="openai">OpenAI (GPT)</option>
                           <option value="gemini">Google Gemini</option>
@@ -882,7 +887,7 @@ export default function AuditPage() {
                             type={showApiKey ? 'text' : 'password'}
                             value={claudeApiKey}
                             onChange={(e) => setClaudeApiKey(e.target.value)}
-                            placeholder={provider === 'gemini' ? 'AIzaSy...' : `sk-${provider === 'anthropic' ? 'ant-' : provider === 'openrouter' ? 'or-' : 'proj-'}...`}
+                            placeholder={provider === 'gemini' ? 'AIzaSy...' : provider === 'ipaship' ? 'nvapi-...' : `sk-${provider === 'anthropic' ? 'ant-' : provider === 'openrouter' ? 'or-' : 'proj-'}...`}
                             className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all font-mono"
                           />
                           {claudeApiKey && (
