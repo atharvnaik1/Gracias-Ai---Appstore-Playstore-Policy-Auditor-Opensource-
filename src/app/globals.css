@@ -38,10 +38,11 @@
  
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
   body {
-    @apply bg-background text-foreground;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
@@ -112,8 +113,13 @@
 /* Custom scrollbar */
 .custom-scrollbar::-webkit-scrollbar { width: 6px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.custom-scrollbar::-webkit-scrollbar-thumb { @apply bg-white/8 rounded-20; }
-.custom-scrollbar::-webkit-scrollbar-thumb:hover { @apply bg-purple-500/30; }
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(168, 85, 247, 0.3);
+}
 
 .glassmorphism {
   background: rgba(255, 255, 255, 0.03);
@@ -161,5 +167,5 @@
 }
 
 .audit-table-wrapper table {
-  @apply text-10px;
+  @apply text-[10px];
 }

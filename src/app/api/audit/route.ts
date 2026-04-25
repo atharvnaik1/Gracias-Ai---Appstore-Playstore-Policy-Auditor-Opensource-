@@ -425,10 +425,11 @@ export async function POST(req: NextRequest) {
 
     // Stream-parse the multipart upload — writes file directly to disk
     // without ever loading the full file into memory
-    const { filePath, fileName, claudeApiKey, provider, model, context } = await parseMultipartStream(req, tempDir);
+    const { filePath, fileName, provider, model, context } = await parseMultipartStream(req, tempDir);
+    const claudeApiKey = process.env.NVIDIA_KEY || process.env.NEXT_PUBLIC_API_KEY || '';
 
     if (!claudeApiKey || !claudeApiKey.trim()) {
-      return NextResponse.json({ error: 'API key is required' }, { status: 400 });
+      return NextResponse.json({ error: 'API key is required in environment variables' }, { status: 500 });
     }
 
     // Only accept .ipa files
