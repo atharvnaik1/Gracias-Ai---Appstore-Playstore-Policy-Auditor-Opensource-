@@ -198,8 +198,8 @@ export default function AuditPage() {
     const droppedFile = e.dataTransfer.files[0];
     if (droppedFile) {
       const ext = droppedFile.name.split('.').pop()?.toLowerCase();
-      if (ext !== 'ipa') {
-        setErrorMessage('Please upload an .ipa file');
+      if (ext !== 'ipa' && ext !== 'apk' && ext !== 'zip') {
+        setErrorMessage('Please upload an .ipa, .apk, or .zip file');
       } else if (droppedFile.size > 150 * 1024 * 1024) {
         setErrorMessage('File exceeds maximum size of 150MB');
       } else {
@@ -213,8 +213,8 @@ export default function AuditPage() {
     const selected = e.target.files?.[0];
     if (selected) {
       const ext = selected.name.split('.').pop()?.toLowerCase();
-      if (ext !== 'ipa') {
-        setErrorMessage('Please upload an .ipa file');
+      if (ext !== 'ipa' && ext !== 'apk' && ext !== 'zip') {
+        setErrorMessage('Please upload an .ipa, .apk, or .zip file');
         e.target.value = '';
         return;
       }
@@ -750,7 +750,7 @@ export default function AuditPage() {
                         <input
                           ref={fileInputRef}
                           type="file"
-                          accept=".ipa"
+                          accept=".ipa,.apk,.zip"
                           onChange={handleFileSelect}
                           className="hidden"
                         />
@@ -813,10 +813,10 @@ export default function AuditPage() {
                                 <Upload className="w-7 h-7 text-muted-foreground group-hover:text-primary transition-colors" />
                               </div>
                               <p className="text-white font-semibold text-sm md:text-base mb-1">
-                                Drop your .ipa file here
+                                Drop your app bundle here
                               </p>
                               <p className="text-muted-foreground text-xs mb-3">
-                                <span className="text-primary">.ipa</span> files up to 150MB
+                                <span className="text-primary">.ipa, .apk, .zip</span> files up to 150MB
                               </p>
                               <span className="text-[10px] text-muted-foreground/60 font-medium">
                                 .swift, .m, .plist, .entitlements, .storyboard &amp; more
