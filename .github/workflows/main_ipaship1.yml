@@ -6,6 +6,11 @@ on:
       - main
   workflow_dispatch:
 
+# ✅ REQUIRED for Azure OIDC
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -44,14 +49,18 @@ jobs:
         with:
           name: node-app
 
+      # 🧪 DEBUG (remove later)
+      - name: Debug OIDC
+        run: echo $ACTIONS_ID_TOKEN_REQUEST_URL
+
       - name: Azure Login
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_03484BCC7B2349F5A109A2D6A4658641 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_616D1130410543E5A1F8BEE0ABDC4552 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_FD3DE9ACEBAF4DB1952520E866B84516 }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Deploy
+      - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'ipaship1'
