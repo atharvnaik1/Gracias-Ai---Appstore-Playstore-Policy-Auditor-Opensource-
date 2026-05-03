@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "description": "ipaShip Node.js wrapper",
   "main": "index.js",
-  "scripts": { "test": "echo \"Error: no test specified\" && exit 1" },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
   "author": "async-atharv",
-  "license": "MIT"
+  "license": "Polyform Noncommercial License 1.0.0"
 }

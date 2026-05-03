@@ -3,5 +3,5 @@ Version: 1.0.0
 Title: ipaShip R Wrapper
 Description: R client for auditing iOS applications via ipaship.com
 Author: async-atharv
-Maintainer: async-atharv <hello@ipaship.com>
-License: MIT
+Maintainer: async-atharv <atharv.naik@gracias.sh>
+License: Polyform Noncommercial License 1.0.0

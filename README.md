@@ -2,7 +2,7 @@
 
 AI-powered iOS App Store compliance auditor. Upload your `.ipa` file and get a comprehensive audit against Apple's Review Guidelines — before you submit.
 
-**Live at: [opensource.ipaship.com](https://opensource.ipaship.com)**
+**Live at: [ipaship.com](https://ipaship.com)**
 
 ## Features
 
