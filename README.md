@@ -212,3 +212,30 @@ Open source. See repository for details.
 
 Built by [ipaShip](https://ipaship.com)
 © ipaShip – Original Creator: Atharv Naik
+
+## Quick Start
+
+1. **Clone & install**
+   ```bash
+   git clone https://github.com/atharvnaik1/ipaship-app-reviewer.git
+   cd ipaship-app-reviewer
+   npm install
+   ```
+
+2. **Set up environment**
+   ```bash
+   cp .env.example .env.local
+   # Edit .env.local with your MongoDB URI and API keys
+   ```
+
+3. **Start MongoDB** (local or Docker)
+   ```bash
+   docker run -d -p 27017:27017 --name mongo mongo:7
+   ```
+
+4. **Run the app**
+   ```bash
+   npm run dev
+   ```
+
+5. Open [http://localhost:3000](http://localhost:3000)
