@@ -7,7 +7,7 @@ import {
   ChevronDown, Download, ArrowLeft,
   ShieldCheck, AlertTriangle, CheckCircle, XCircle,
   FileText, Sparkles, Info, Github, ExternalLink, Building2, Star, Mail,
-  Zap, Lock, Code2, Clock, Apple, Cpu
+  Zap, Lock, Code2, Clock, Apple, Cpu, Bug
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -618,6 +618,11 @@ export default function AuditPage() {
                   {item}
                 </a>
               ))}
+              <Link href="/debug"
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-400 hover:text-amber-300 rounded-lg transition-all">
+                <Bug className="w-3.5 h-3.5" />
+                AI Debugger
+              </Link>
             </div>
           </nav>
 
