@@ -409,7 +409,7 @@ ${isAndroid ? `### 1. Restricted Content & Safety
 
 ---
 
-> **Reach us to fasten up your development and deployment with a stress-free journey: business@gracias.sh**
+> **Reach us to fasten up your development and deployment with a stress-free journey: hello@ipaship.com**
 
 ## Phase 2: Remediation Plan
 
@@ -454,11 +454,6 @@ export async function POST(req: NextRequest) {
     // Stream-parse the multipart upload — writes file directly to disk
     // without ever loading the full file into memory
     const { filePath, fileName, provider, model, context } = await parseMultipartStream(req, tempDir);
-    const resolvedApiKey = process.env.NVIDIA_KEY || process.env.NEXT_PUBLIC_API_KEY || '';
-
-    if (!resolvedApiKey || !resolvedApiKey.trim()) {
-      return NextResponse.json({ error: 'API key is required in environment variables' }, { status: 500 });
-    }
 
     // Only accept .ipa, .apk, .zip files
     const ext = path.extname(fileName).toLowerCase();
@@ -495,6 +490,19 @@ export async function POST(req: NextRequest) {
     const VALID_PROVIDERS = new Set(['ipaship', 'anthropic', 'openai', 'gemini', 'openrouter']);
     if (!VALID_PROVIDERS.has(provider)) {
       return NextResponse.json({ error: `Invalid provider: ${provider}` }, { status: 400 });
+    }
+
+    const providerApiKeys: Record<string, string | undefined> = {
+      ipaship: process.env.NVIDIA_KEY || process.env.NEXT_PUBLIC_API_KEY,
+      anthropic: process.env.ANTHROPIC_API_KEY,
+      openai: process.env.OPENAI_API_KEY,
+      gemini: process.env.GEMINI_API_KEY,
+      openrouter: process.env.OPENROUTER_API_KEY,
+    };
+    const resolvedApiKey = providerApiKeys[provider] || '';
+
+    if (!resolvedApiKey.trim()) {
+      return NextResponse.json({ error: `API key is required for ${provider} in environment variables` }, { status: 500 });
     }
 
     // AbortController to cancel AI request if client disconnects

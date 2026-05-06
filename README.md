@@ -44,14 +44,14 @@ sudo apt-get update && sudo apt-get install -y unzip
 
 ```bash
 # Clone the repo
-git clone https://github.com/atharvnaik1/ipaShip-Ai---Appstore-Playstore-Policy-Auditor-Opensource-.git
-cd ipaShip-Ai---Appstore-Playstore-Policy-Auditor-Opensource-
+git clone https://github.com/atharvnaik1/ipaship-app-reviewer.git
+cd ipaship-app-reviewer
 
 # Install dependencies
 npm install
 
-# Create environment file
-echo 'MONGODB_URI=your_mongodb_uri_here' > .env.local
+# Create environment file and fill in the required values
+cp .env.example .env.local
 
 # Start dev server
 npm run dev
@@ -179,7 +179,7 @@ A deployment script is included for Ubuntu 24.04 VMs:
 
 ```bash
 # On the server, create .env.local first
-echo 'MONGODB_URI=your_mongodb_uri_here' > /opt/ipaship/.env.local
+cp .env.example /opt/ipaship/.env.local
 
 # Ensure unzip is installed (required by /api/audit extraction)
 sudo apt-get update && sudo apt-get install -y unzip
