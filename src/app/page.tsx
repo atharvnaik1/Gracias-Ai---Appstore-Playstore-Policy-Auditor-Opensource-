@@ -49,6 +49,10 @@ const providerModels: Record<string, { label: string; value: string }[]> = {
     { label: 'ipaShip AI Core', value: 'meta/llama-3.1-405b-instruct' },
     { label: 'ipaShip AI Fast', value: 'meta/llama-3.1-70b-instruct' },
   ],
+  nvidia: [
+    { label: 'Llama 3.1 70B Instruct', value: 'meta/llama-3.1-70b-instruct' },
+    { label: 'Llama 3.1 405B Instruct', value: 'meta/llama-3.1-405b-instruct' },
+  ],
 };
 
 const selectStyle = {
@@ -62,6 +66,7 @@ export default function AuditPage() {
   const [file, setFile] = useState<File | null>(null);
   const [provider, setProvider] = useState('ipaship');
   const [model, setModel] = useState('glm-5.1');
+  const [apiKey, setApiKey] = useState('');
   const [context, setContext] = useState('');
   const [phase, setPhase] = useState<AuditPhase>('idle');
   const [reportContent, setReportContent] = useState('');
@@ -268,6 +273,7 @@ export default function AuditPage() {
         formData.append('fileName', file.name);
         formData.append('provider', provider);
         formData.append('model', model);
+        formData.append('apiKey', apiKey);
         formData.append('context', context);
         response = await fetch('/api/audit', { method: 'POST', body: formData });
       } else {
@@ -277,6 +283,7 @@ export default function AuditPage() {
         formData.append('file', file);
         formData.append('provider', provider);
         formData.append('model', model);
+        formData.append('apiKey', apiKey);
         formData.append('context', context);
         response = await fetch('/api/audit', { method: 'POST', body: formData });
         setPhase('analyzing');
@@ -851,6 +858,7 @@ export default function AuditPage() {
                           <option value="openai">OpenAI (GPT)</option>
                           <option value="gemini">Google Gemini</option>
                           <option value="openrouter">OpenRouter</option>
+                          <option value="nvidia">NVIDIA NIM</option>
                         </select>
                         <select
                           value={model}
@@ -865,6 +873,21 @@ export default function AuditPage() {
                       </div>
 
                       {/* API Key */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Key className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-xs font-semibold text-white">API Key <span className="text-muted-foreground font-normal">(BYOK)</span></span>
+                        </div>
+                        <input
+                          type="password"
+                          value={apiKey}
+                          onChange={(e) => setApiKey(e.target.value)}
+                          placeholder={`Paste your ${provider === 'nvidia' || provider === 'ipaship' ? 'NVIDIA' : provider === 'anthropic' ? 'Claude' : provider} key`}
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-400/50 focus:ring-1 focus:ring-emerald-400/50 transition-all"
+                          autoComplete="off"
+                        />
+                        <p className="text-[10px] text-muted-foreground/60">Sent only with this audit request and never stored by the app.</p>
+                      </div>
 
                       {/* Context */}
                       <div className="flex-1 flex flex-col space-y-2">
@@ -943,7 +966,7 @@ export default function AuditPage() {
                       icon: <Lock className="w-5 h-5 text-green-400" />,
                       iconBg: 'bg-green-500/10 border-green-500/20',
                       title: 'Zero Trust Security',
-                      desc: 'Your code is processed in ephemeral temp storage and deleted immediately. API keys stay in your browser, never on our servers.',
+                      desc: 'Your code is processed in ephemeral temp storage and deleted immediately. API keys are used only for the active audit request.',
                     },
                     {
                       icon: <Code2 className="w-5 h-5 text-blue-400" />,
@@ -955,7 +978,7 @@ export default function AuditPage() {
                       icon: <Cpu className="w-5 h-5 text-purple-400" />,
                       iconBg: 'bg-purple-500/10 border-purple-500/20',
                       title: 'Multi-Provider BYOK',
-                      desc: 'Bring your own key from Anthropic, OpenAI, Google Gemini, or OpenRouter. Choose the model that works best for you.',
+                      desc: 'Bring your own key from NVIDIA NIM, Anthropic, OpenAI, Google Gemini, or OpenRouter. Choose the model that works best for you.',
                     },
                     {
                       icon: <FileText className="w-5 h-5 text-cyan-400" />,
