@@ -8,7 +8,7 @@ const starsCache = new LRUCache<string, number>({
   ttl: 1000 * 60 * 5, // 5 minutes
 });
 
-const REPO = 'https://github.com/atharvnaik1/GraciasAi-Appstore-Policy-Auditor-Opensource';
+const REPO = 'atharvnaik1/GraciasAi-Appstore-Policy-Auditor-Opensource';
 const CACHE_KEY = 'stars';
 
 export async function GET() {
@@ -18,7 +18,7 @@ export async function GET() {
       return NextResponse.json({ stars: cached });
     }
 
-    const res = await fetch(`https://api.github.com/repos/${REPO}`, {
+    const res = await fetch(`https://api.github.com/repos/${encodeURI(REPO)}`, {
       headers: { Accept: 'application/vnd.github.v3+json' },
       next: { revalidate: 0 },
     });
