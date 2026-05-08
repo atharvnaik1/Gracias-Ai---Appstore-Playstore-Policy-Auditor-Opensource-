@@ -132,6 +132,13 @@ const ctaSection = {
   secondary: 'GitHub',
 };
 
+const auditProgressSteps = [
+  { label: 'Upload', description: 'Bundle received' },
+  { label: 'Extract', description: 'Source files indexed' },
+  { label: 'Review', description: 'Policy analysis running' },
+  { label: 'Report', description: 'Fix plan generated' },
+];
+
 export default function AuditPage() {
   const [file, setFile] = useState<File | null>(null);
   const [provider, setProvider] = useState('ipaship');
@@ -1116,69 +1123,72 @@ export default function AuditPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="max-w-4xl mx-auto py-12 md:py-16"
+              className="py-8 md:py-12"
             >
-              <div className="glassmorphism rounded-3xl p-8 md:p-12 relative overflow-hidden border border-white/10">
-                {/* Pulse rings */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-15">
-                  <motion.div animate={{ scale: [1, 3], opacity: [0.5, 0] }} transition={{ duration: 3, repeat: Infinity }} className="absolute w-20 h-20 border border-primary rounded-full" />
-                  <motion.div animate={{ scale: [1, 3], opacity: [0.5, 0] }} transition={{ duration: 3, repeat: Infinity, delay: 1 }} className="absolute w-20 h-20 border border-blue-500 rounded-full" />
-                  <motion.div animate={{ scale: [1, 3], opacity: [0.5, 0] }} transition={{ duration: 3, repeat: Infinity, delay: 2 }} className="absolute w-20 h-20 border border-green-500 rounded-full" />
-                </div>
-
-                <div className="relative z-10 flex flex-col items-center text-center">
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
-                    className="p-4 rounded-full bg-gradient-to-tr from-primary/20 to-blue-500/20 border border-white/10 shadow-lg shadow-primary/20 mb-8"
-                  >
-                    <Loader2 className="w-10 h-10 text-white" />
-                  </motion.div>
-
-                  <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">
-                    {phase === 'uploading' ? 'Extracting Bundle' : 'Analyzing Your Code'}
-                  </h2>
-
-                  <AnimatePresence mode="wait">
-                    <motion.p
-                      key={phase + filesScanned}
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -5 }}
-                      className="text-muted-foreground text-sm md:text-base mb-8"
+              <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
+                <aside className="rounded-2xl border border-[#f4f0e8]/10 bg-[#090c0b]/88 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.32)]">
+                  <div className="flex items-center justify-between gap-4 border-b border-[#f4f0e8]/10 pb-5">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#9be15d]">Live audit</p>
+                      <h2 className="mt-2 text-2xl font-black text-[#f4f0e8]">
+                        {phase === 'uploading' ? 'Extracting bundle' : 'Reviewing source'}
+                      </h2>
+                    </div>
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 7, repeat: Infinity, ease: 'linear' }}
+                      className="grid h-12 w-12 place-items-center rounded-full border border-[#9be15d]/25 bg-[#9be15d]/10"
                     >
-                      {phase === 'uploading'
-                        ? 'Decompressing and parsing source files...'
-                        : filesScanned > 0
-                          ? `Auditing ${filesScanned} source files against App Store guidelines...`
-                          : 'Establishing context window...'}
-                    </motion.p>
-                  </AnimatePresence>
+                      <Loader2 className="h-6 w-6 text-[#9be15d]" />
+                    </motion.div>
+                  </div>
 
-                  {/* Progress bar */}
-                  <div className="w-full max-w-sm mb-6">
-                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                  <div className="mt-5 rounded-xl border border-[#f4f0e8]/10 bg-[#f4f0e8]/[0.035] p-4">
+                    <p className="truncate text-sm font-semibold text-[#f4f0e8]">{file?.name || 'App bundle'}</p>
+                    <div className="mt-2 flex items-center justify-between text-xs text-[#8b9691]">
+                      <span>{file ? formatFileSize(file.size) : 'Waiting for file'}</span>
+                      <span>{uploadSpeed || `${uploadProgress}%`}</span>
+                    </div>
+                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#f4f0e8]/10">
                       <motion.div
-                        className="h-full w-1/3 bg-gradient-to-r from-primary to-blue-400 rounded-full"
-                        animate={{ x: ['-100%', '300%'] }}
-                        transition={{ duration: 2, ease: "easeInOut", repeat: Infinity }}
+                        className="h-full rounded-full bg-[#9be15d]"
+                        animate={{ width: phase === 'uploading' ? `${Math.max(uploadProgress, 8)}%` : '100%' }}
+                        transition={{ duration: 0.4 }}
                       />
                     </div>
                   </div>
 
-                  {/* File list */}
+                  <div className="mt-6 space-y-3">
+                    {auditProgressSteps.map((step, index) => {
+                      const activeIndex = phase === 'uploading' ? 1 : reportContent ? 3 : 2;
+                      const isActive = index === activeIndex;
+                      const isDone = index < activeIndex;
+                      return (
+                        <div key={step.label} className={`flex gap-3 rounded-xl border p-3 ${isActive ? 'border-[#9be15d]/35 bg-[#9be15d]/8' : 'border-[#f4f0e8]/10 bg-[#f4f0e8]/[0.02]'}`}>
+                          <span className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[10px] font-black ${isDone ? 'border-[#9be15d] bg-[#9be15d] text-[#050606]' : isActive ? 'border-[#9be15d] text-[#9be15d]' : 'border-[#f4f0e8]/18 text-[#8b9691]'}`}>
+                            {isDone ? '✓' : index + 1}
+                          </span>
+                          <span>
+                            <span className="block text-sm font-semibold text-[#f4f0e8]">{step.label}</span>
+                            <span className="mt-0.5 block text-xs text-[#8b9691]">{step.description}</span>
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
                   {filesScanned > 0 && (
-                    <div className="w-full max-w-sm">
+                    <div className="mt-6">
                       <button
                         onClick={() => setShowFileList(!showFileList)}
-                        className="w-full py-2 px-3 rounded-xl bg-white/5 hover:bg-white/[0.08] border border-white/5 text-xs font-medium text-muted-foreground hover:text-white transition-all flex items-center justify-between"
+                        className="flex w-full items-center justify-between rounded-xl border border-[#f4f0e8]/10 bg-[#f4f0e8]/[0.035] px-4 py-3 text-left text-xs font-semibold text-[#c9d0cb] transition-colors hover:border-[#9be15d]/35 hover:text-[#f4f0e8]"
                       >
                         <span className="flex items-center gap-2">
-                          <FileText className="w-3.5 h-3.5 text-primary" />
-                          {filesScanned} files queued
+                          <FileText className="h-4 w-4 text-[#9be15d]" />
+                          {filesScanned} source files queued
                         </span>
                         <motion.div animate={{ rotate: showFileList ? 180 : 0 }}>
-                          <ChevronDown className="w-3.5 h-3.5" />
+                          <ChevronDown className="h-4 w-4" />
                         </motion.div>
                       </button>
 
@@ -1186,14 +1196,14 @@ export default function AuditPage() {
                         {showFileList && (
                           <motion.div
                             initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1, marginTop: 8 }}
+                            animate={{ height: 'auto', opacity: 1, marginTop: 10 }}
                             exit={{ height: 0, opacity: 0, marginTop: 0 }}
                             className="overflow-hidden"
                           >
-                            <div className="max-h-40 overflow-y-auto bg-black/40 border border-white/5 rounded-xl p-3 custom-scrollbar text-left">
+                            <div className="max-h-48 overflow-y-auto rounded-xl border border-[#f4f0e8]/10 bg-black/35 p-3 custom-scrollbar">
                               {fileNames.map((name, i) => (
-                                <div key={i} className="text-[10px] text-muted-foreground font-mono py-1 flex items-center gap-2 border-b border-white/[0.03] last:border-0">
-                                  <div className="w-1 h-1 rounded-full bg-primary/50 shrink-0" />
+                                <div key={`${name}-${i}`} className="flex items-center gap-2 border-b border-[#f4f0e8]/[0.05] py-1.5 font-mono text-[10px] text-[#8b9691] last:border-0">
+                                  <div className="h-1 w-1 shrink-0 rounded-full bg-[#9be15d]/60" />
                                   <span className="truncate">{name}</span>
                                 </div>
                               ))}
@@ -1203,30 +1213,36 @@ export default function AuditPage() {
                       </AnimatePresence>
                     </div>
                   )}
-                </div>
-              </div>
+                </aside>
 
-              {/* Live streaming preview */}
-              {reportContent && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-6 glassmorphism rounded-2xl overflow-hidden border border-primary/20"
-                >
-                  <div className="px-4 py-3 border-b border-white/10 bg-black/40 flex items-center gap-2.5 sticky top-0 z-20">
-                    <div className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                <section className="min-h-[560px] overflow-hidden rounded-2xl border border-[#f4f0e8]/10 bg-[#070909] shadow-[0_24px_80px_rgba(0,0,0,0.32)]">
+                  <div className="flex items-center justify-between border-b border-[#f4f0e8]/10 bg-[#050606]/88 px-5 py-4">
+                    <div className="flex items-center gap-2.5">
+                      <div className="relative flex h-2.5 w-2.5">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#9be15d] opacity-70" />
+                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#9be15d]" />
+                      </div>
+                      <span className="text-xs font-bold uppercase tracking-[0.24em] text-[#c9d0cb]">Streaming report</span>
                     </div>
-                    <span className="text-xs font-semibold text-white/70 uppercase tracking-wider">Live Stream</span>
+                    <span className="hidden text-xs text-[#8b9691] sm:inline">
+                      {reportContent ? `${reportContent.length.toLocaleString()} chars` : 'Waiting for first token'}
+                    </span>
                   </div>
-                  <div ref={reportRef} className="p-5 md:p-8 max-h-[400px] overflow-y-auto custom-scrollbar bg-black/20">
-                    <div className="prose prose-invert max-w-none text-xs md:text-sm leading-relaxed">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{reportContent}</ReactMarkdown>
-                    </div>
+                  <div ref={reportRef} className="max-h-[620px] min-h-[500px] overflow-y-auto bg-[radial-gradient(circle_at_20%_0%,rgba(155,225,93,0.08),transparent_28%)] p-5 custom-scrollbar md:p-8">
+                    {reportContent ? (
+                      <div className="prose prose-invert max-w-none text-xs leading-relaxed md:text-sm">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{reportContent}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      <div className="flex min-h-[430px] flex-col items-center justify-center text-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-[#9be15d]" />
+                        <p className="mt-5 text-lg font-semibold text-[#f4f0e8]">Preparing policy context</p>
+                        <p className="mt-2 max-w-sm text-sm leading-relaxed text-[#8b9691]">The report stream will appear here as soon as the model starts returning findings.</p>
+                      </div>
+                    )}
                   </div>
-                </motion.div>
-              )}
+                </section>
+              </div>
             </motion.div>
           )}
 
@@ -1240,64 +1256,66 @@ export default function AuditPage() {
               className="py-8 md:py-12 space-y-6"
             >
               {/* Status bar */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-2xl bg-green-500/5 border border-green-500/20">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-green-500/15 border border-green-500/20">
-                    <CheckCircle className="w-5 h-5 text-green-400" />
-                  </div>
+              <div className="rounded-2xl border border-[#9be15d]/20 bg-[#07100c]/88 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.28)] md:p-5">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-11 w-11 place-items-center rounded-xl border border-[#9be15d]/25 bg-[#9be15d]/12">
+                      <CheckCircle className="w-5 h-5 text-[#9be15d]" />
+                    </div>
                   <div>
-                    <h3 className="text-white font-bold text-sm">Audit Complete</h3>
-                    <p className="text-muted-foreground text-xs">{filesScanned} files analyzed</p>
+                      <h3 className="text-[#f4f0e8] font-bold text-sm">Audit Complete</h3>
+                      <p className="text-[#8b9691] text-xs">{filesScanned} files analyzed{file ? ` · ${file.name}` : ''}</p>
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <button
-                    onClick={handleExportReport}
-                    disabled={!hasReport}
-                    className="flex-1 sm:flex-none px-4 py-2.5 bg-white text-black hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all"
-                  >
-                    <Download className="w-3.5 h-3.5" /> Markdown
-                  </button>
-                  <button
-                    onClick={handleExportFixPlan}
-                    disabled={!hasReport}
-                    className="flex-1 sm:flex-none px-4 py-2.5 bg-primary text-white hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all"
-                  >
-                    <CheckCircle className="w-3.5 h-3.5" /> Fix Plan
-                  </button>
-                  <button
-                    onClick={handleExportPdf}
-                    disabled={!hasReport}
-                    className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all"
-                  >
-                    <FileText className="w-3.5 h-3.5" /> PDF
-                  </button>
-                  <button
-                    onClick={() => {
-                      setPhase('idle');
-                      setReportContent('');
-                      setFile(null);
-                      setUploadedFileId(null);
-                      setUploadError('');
-                      setUploadProgress(0);
-                      setUploadSpeed('');
-                      setIsAutoAnalyzing(false);
-                      autoTriggeredFileIdRef.current = null;
-                    }}
-                    className="flex-1 sm:flex-none px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all"
-                  >
-                    <ArrowLeft className="w-3.5 h-3.5" /> New Audit
-                  </button>
+                  <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4 xl:w-auto">
+                    <button
+                      onClick={handleExportFixPlan}
+                      disabled={!hasReport}
+                      className="rounded-xl bg-[#9be15d] px-4 py-2.5 text-xs font-black text-[#050606] transition-colors hover:bg-[#b7f278] disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      <CheckCircle className="w-3.5 h-3.5" /> Fix Plan
+                    </button>
+                    <button
+                      onClick={handleExportReport}
+                      disabled={!hasReport}
+                      className="rounded-xl border border-[#f4f0e8]/12 bg-[#f4f0e8]/8 px-4 py-2.5 text-xs font-semibold text-[#f4f0e8] transition-colors hover:bg-[#f4f0e8]/12 disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Markdown
+                    </button>
+                    <button
+                      onClick={handleExportPdf}
+                      disabled={!hasReport}
+                      className="rounded-xl border border-[#f4f0e8]/12 bg-[#f4f0e8]/8 px-4 py-2.5 text-xs font-semibold text-[#f4f0e8] transition-colors hover:bg-[#f4f0e8]/12 disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      <FileText className="w-3.5 h-3.5" /> PDF
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPhase('idle');
+                        setReportContent('');
+                        setFile(null);
+                        setUploadedFileId(null);
+                        setUploadError('');
+                        setUploadProgress(0);
+                        setUploadSpeed('');
+                        setIsAutoAnalyzing(false);
+                        autoTriggeredFileIdRef.current = null;
+                      }}
+                      className="rounded-xl border border-[#f4f0e8]/12 bg-transparent px-4 py-2.5 text-xs font-semibold text-[#f4f0e8] transition-colors hover:bg-[#f4f0e8]/8 flex items-center justify-center gap-1.5"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" /> New Audit
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {/* Review Readiness Dashboard */}
-              <div className="rounded-2xl border border-white/10 bg-black/30 overflow-hidden">
-                <div className="px-5 md:px-6 py-4 border-b border-white/10 bg-black/40 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div className="overflow-hidden rounded-2xl border border-[#f4f0e8]/10 bg-[#070909]/92">
+                <div className="px-5 md:px-6 py-4 border-b border-[#f4f0e8]/10 bg-[#050606]/80 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <div>
-                    <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Review Readiness Intelligence</p>
-                    <h2 className="text-xl md:text-2xl font-black text-white mt-1">Submission Command Center</h2>
+                    <p className="text-[10px] uppercase tracking-widest text-[#8b9691] font-bold">Review Readiness Intelligence</p>
+                    <h2 className="text-xl md:text-2xl font-black text-[#f4f0e8] mt-1">Submission Command Center</h2>
                   </div>
                   <div className={`px-3 py-2 rounded-xl border text-xs font-black ${readinessTone}`}>
                     {reportSummary.verdict === 'UNKNOWN' ? 'PENDING VERDICT' : reportSummary.verdict}
@@ -1305,15 +1323,15 @@ export default function AuditPage() {
                 </div>
 
                 <div className="p-5 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-4">
-                  <div className="lg:col-span-3 rounded-xl border border-white/10 bg-white/[0.03] p-5">
-                    <p className="text-xs font-semibold text-muted-foreground">Readiness Score</p>
+                  <div className="lg:col-span-3 rounded-xl border border-[#f4f0e8]/10 bg-[#f4f0e8]/[0.035] p-5">
+                    <p className="text-xs font-semibold text-[#8b9691]">Readiness Score</p>
                     <div className="mt-3 flex items-end gap-2">
-                      <span className="text-5xl font-black text-white leading-none">
+                      <span className="text-5xl font-black text-[#f4f0e8] leading-none">
                         {reportSummary.score === null ? 'Pending' : reportSummary.score}
                       </span>
-                      {reportSummary.score !== null && <span className="text-sm font-bold text-muted-foreground mb-1">/100</span>}
+                      {reportSummary.score !== null && <span className="text-sm font-bold text-[#8b9691] mb-1">/100</span>}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-4">
+                    <p className="text-xs text-[#8b9691] mt-4">
                       {reportSummary.estimatedFixEffort ? `Estimated fix effort: ${reportSummary.estimatedFixEffort}` : 'Score appears after the report includes readiness metrics.'}
                     </p>
                   </div>
@@ -1327,15 +1345,15 @@ export default function AuditPage() {
                     ))}
                   </div>
 
-                  <div className="lg:col-span-5 rounded-xl border border-white/10 bg-white/[0.03] p-5">
-                    <p className="text-xs font-bold text-white uppercase tracking-wider">Recommended Next Action</p>
-                    <p className="text-sm text-muted-foreground leading-relaxed mt-2">
+                  <div className="lg:col-span-5 rounded-xl border border-[#f4f0e8]/10 bg-[#f4f0e8]/[0.035] p-5">
+                    <p className="text-xs font-bold text-[#f4f0e8] uppercase tracking-wider">Recommended Next Action</p>
+                    <p className="text-sm text-[#c9d0cb]/76 leading-relaxed mt-2">
                       {reportSummary.recommendedNextAction || blockers[0] || 'Review the full report and resolve the highest severity items first.'}
                     </p>
                     {reportSummary.policyCategories.length > 0 && (
                       <div className="flex flex-wrap gap-2 mt-4">
                         {reportSummary.policyCategories.slice(0, 5).map((category: string) => (
-                          <span key={category} className="px-2.5 py-1 rounded-full border border-white/10 bg-white/5 text-[10px] font-semibold text-muted-foreground">
+                          <span key={category} className="px-2.5 py-1 rounded-full border border-[#f4f0e8]/10 bg-[#f4f0e8]/5 text-[10px] font-semibold text-[#8b9691]">
                             {category}
                           </span>
                         ))}
@@ -1343,41 +1361,41 @@ export default function AuditPage() {
                     )}
                   </div>
 
-                  <div className="lg:col-span-6 rounded-xl border border-white/10 bg-white/[0.03] p-5">
+                  <div className="lg:col-span-6 rounded-xl border border-[#f4f0e8]/10 bg-[#f4f0e8]/[0.035] p-5">
                     <div className="flex items-center gap-2 mb-4">
                       <AlertTriangle className="w-4 h-4 text-orange-300" />
-                      <p className="text-xs font-bold text-white uppercase tracking-wider">Top Blockers</p>
+                      <p className="text-xs font-bold text-[#f4f0e8] uppercase tracking-wider">Top Blockers</p>
                     </div>
                     {blockers.length > 0 ? (
                       <ul className="space-y-3">
                         {blockers.map((item: string) => (
-                          <li key={item} className="flex gap-3 text-sm text-muted-foreground leading-relaxed">
+                          <li key={item} className="flex gap-3 text-sm text-[#c9d0cb]/76 leading-relaxed">
                             <span className="mt-2 h-1.5 w-1.5 rounded-full bg-orange-300 shrink-0" />
                             <span>{item}</span>
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-sm text-muted-foreground">No blocker list was found in the structured summary.</p>
+                      <p className="text-sm text-[#8b9691]">No blocker list was found in the structured summary.</p>
                     )}
                   </div>
 
-                  <div className="lg:col-span-6 rounded-xl border border-white/10 bg-white/[0.03] p-5">
+                  <div className="lg:col-span-6 rounded-xl border border-[#f4f0e8]/10 bg-[#f4f0e8]/[0.035] p-5">
                     <div className="flex items-center gap-2 mb-4">
                       <CheckCircle className="w-4 h-4 text-green-300" />
-                      <p className="text-xs font-bold text-white uppercase tracking-wider">Quick Wins</p>
+                      <p className="text-xs font-bold text-[#f4f0e8] uppercase tracking-wider">Quick Wins</p>
                     </div>
                     {quickWins.length > 0 ? (
                       <ul className="space-y-3">
                         {quickWins.map((item: string) => (
-                          <li key={item} className="flex gap-3 text-sm text-muted-foreground leading-relaxed">
+                          <li key={item} className="flex gap-3 text-sm text-[#c9d0cb]/76 leading-relaxed">
                             <span className="mt-2 h-1.5 w-1.5 rounded-full bg-green-300 shrink-0" />
                             <span>{item}</span>
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-sm text-muted-foreground">Quick wins will appear when the report includes low-effort remediation items.</p>
+                      <p className="text-sm text-[#8b9691]">Quick wins will appear when the report includes low-effort remediation items.</p>
                     )}
                   </div>
                 </div>
