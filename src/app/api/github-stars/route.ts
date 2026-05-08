@@ -8,8 +8,8 @@ const starsCache = new LRUCache<string, number>({
   ttl: 1000 * 60 * 5, // 5 minutes
 });
 
-export const GITHUB_REPO = 'atharvnaik1/ipaship-app-reviewer';
-export const GITHUB_API_URL = `https://api.github.com/repos/${GITHUB_REPO}`;
+const GITHUB_REPO = 'atharvnaik1/ipaship-app-reviewer';
+const GITHUB_API_URL = `https://api.github.com/repos/${GITHUB_REPO}`;
 const CACHE_KEY = 'stars';
 
 export async function GET() {

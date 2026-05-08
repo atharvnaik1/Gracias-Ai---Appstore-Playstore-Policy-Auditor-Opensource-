@@ -1,18 +1,19 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Upload, FileArchive, Key, Loader2,
   ChevronDown, Download, ArrowLeft,
   ShieldCheck, AlertTriangle, CheckCircle, XCircle,
   FileText, Sparkles, Info, Github, ExternalLink, Building2, Star, Mail,
-  Lock, Code2, Clock, Apple, Cpu
+  Zap, Lock, Code2, Clock, Apple, Cpu
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import Link from 'next/link';
 import { UserButton, SignedOut, SignedIn, useAuth, useClerk } from '@clerk/nextjs';
+import { buildFixPlanMarkdown, parseReportSummary } from '../utils/report-summary.mjs';
 
 type AuditPhase = 'idle' | 'uploading' | 'analyzing' | 'complete' | 'error';
 
@@ -87,6 +88,7 @@ export default function AuditPage() {
   const handleRunAuditRef = useRef<(() => void) | null>(null);
   // Track the fileId that has already been auto-triggered to prevent double-runs
   const autoTriggeredFileIdRef = useRef<string | null>(null);
+  const reportSummary = useMemo(() => parseReportSummary(reportContent), [reportContent]);
 
   useEffect(() => {
     fetch('/api/visitor')
@@ -130,10 +132,15 @@ export default function AuditPage() {
   const startUpload = useCallback((picked: File) => {
     setFile(picked);
     setUploadedFileId(null);
+    autoTriggeredFileIdRef.current = null;
     setUploadProgress(0);
     setUploadSpeed('');
     setUploadError('');
     setIsUploading(true);
+    setErrorMessage('');
+    setReportContent('');
+    setFilesScanned(0);
+    setFileNames([]);
 
     const formData = new FormData();
     formData.append('file', picked);
@@ -168,10 +175,13 @@ export default function AuditPage() {
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const data = JSON.parse(xhr.responseText);
+          if (!data.fileId) {
+            throw new Error('Upload response missing file id.');
+          }
           setUploadedFileId(data.fileId);
           setUploadProgress(100);
-        } catch {
-          setUploadError('Upload response invalid.');
+        } catch (err: any) {
+          setUploadError(err.message || 'Upload response invalid.');
         }
       } else {
         try {
@@ -352,6 +362,24 @@ export default function AuditPage() {
     } catch (err) {
       console.error('Markdown export failed:', err);
       setErrorMessage('Failed to export markdown report');
+    }
+  };
+
+  const handleExportFixPlan = () => {
+    if (!reportContent) return;
+    try {
+      const fixPlan = buildFixPlanMarkdown(reportSummary, reportContent);
+      const blob = new Blob([fixPlan], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ipaship-fix-plan-${new Date().toISOString().slice(0, 10)}.md`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 500);
+    } catch (err) {
+      console.error('Fix plan export failed:', err);
+      setErrorMessage('Failed to export fix plan');
     }
   };
 
@@ -560,6 +588,23 @@ export default function AuditPage() {
   };
 
   const isReady = file && !isUploading && !uploadError;
+  const hasReport = reportContent.trim().length > 0;
+  const readinessTone =
+    reportSummary.verdict === 'READY'
+      ? 'text-green-300 border-green-500/30 bg-green-500/10'
+      : reportSummary.verdict === 'READY WITH CAVEATS'
+        ? 'text-yellow-300 border-yellow-500/30 bg-yellow-500/10'
+        : reportSummary.verdict === 'NOT READY'
+          ? 'text-red-300 border-red-500/30 bg-red-500/10'
+          : 'text-muted-foreground border-white/10 bg-white/5';
+  const severityCards = [
+    { label: 'Critical', value: reportSummary.severityCounts.critical, className: 'text-red-300 bg-red-500/10 border-red-500/20' },
+    { label: 'High', value: reportSummary.severityCounts.high, className: 'text-orange-300 bg-orange-500/10 border-orange-500/20' },
+    { label: 'Medium', value: reportSummary.severityCounts.medium, className: 'text-yellow-300 bg-yellow-500/10 border-yellow-500/20' },
+    { label: 'Low', value: reportSummary.severityCounts.low, className: 'text-blue-300 bg-blue-500/10 border-blue-500/20' },
+  ];
+  const blockers = reportSummary.topBlockers.filter((item: string) => item.toLowerCase() !== 'none found').slice(0, 3);
+  const quickWins = reportSummary.quickWins.filter((item: string) => item.toLowerCase() !== 'none found').slice(0, 3);
 
   return (
     <main className="min-h-[100dvh] w-full bg-background text-foreground selection:bg-primary/30 relative overflow-hidden font-sans">
@@ -1243,22 +1288,132 @@ export default function AuditPage() {
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   <button
                     onClick={handleExportReport}
-                    className="flex-1 sm:flex-none px-4 py-2.5 bg-white text-black hover:bg-gray-100 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all"
+                    disabled={!hasReport}
+                    className="flex-1 sm:flex-none px-4 py-2.5 bg-white text-black hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all"
                   >
                     <Download className="w-3.5 h-3.5" /> Markdown
                   </button>
                   <button
+                    onClick={handleExportFixPlan}
+                    disabled={!hasReport}
+                    className="flex-1 sm:flex-none px-4 py-2.5 bg-primary text-white hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all"
+                  >
+                    <CheckCircle className="w-3.5 h-3.5" /> Fix Plan
+                  </button>
+                  <button
                     onClick={handleExportPdf}
-                    className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 text-white hover:bg-blue-700 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all"
+                    disabled={!hasReport}
+                    className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all"
                   >
                     <FileText className="w-3.5 h-3.5" /> PDF
                   </button>
                   <button
-                    onClick={() => { setPhase('idle'); setReportContent(''); setFile(null); }}
+                    onClick={() => {
+                      setPhase('idle');
+                      setReportContent('');
+                      setFile(null);
+                      setUploadedFileId(null);
+                      setUploadError('');
+                      setUploadProgress(0);
+                      setUploadSpeed('');
+                      setIsAutoAnalyzing(false);
+                      autoTriggeredFileIdRef.current = null;
+                    }}
                     className="flex-1 sm:flex-none px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" /> New Audit
                   </button>
+                </div>
+              </div>
+
+              {/* Review Readiness Dashboard */}
+              <div className="rounded-2xl border border-white/10 bg-black/30 overflow-hidden">
+                <div className="px-5 md:px-6 py-4 border-b border-white/10 bg-black/40 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Review Readiness Intelligence</p>
+                    <h2 className="text-xl md:text-2xl font-black text-white mt-1">Submission Command Center</h2>
+                  </div>
+                  <div className={`px-3 py-2 rounded-xl border text-xs font-black ${readinessTone}`}>
+                    {reportSummary.verdict === 'UNKNOWN' ? 'PENDING VERDICT' : reportSummary.verdict}
+                  </div>
+                </div>
+
+                <div className="p-5 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-4">
+                  <div className="lg:col-span-3 rounded-xl border border-white/10 bg-white/[0.03] p-5">
+                    <p className="text-xs font-semibold text-muted-foreground">Readiness Score</p>
+                    <div className="mt-3 flex items-end gap-2">
+                      <span className="text-5xl font-black text-white leading-none">
+                        {reportSummary.score === null ? 'Pending' : reportSummary.score}
+                      </span>
+                      {reportSummary.score !== null && <span className="text-sm font-bold text-muted-foreground mb-1">/100</span>}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-4">
+                      {reportSummary.estimatedFixEffort ? `Estimated fix effort: ${reportSummary.estimatedFixEffort}` : 'Score appears after the report includes readiness metrics.'}
+                    </p>
+                  </div>
+
+                  <div className="lg:col-span-4 grid grid-cols-2 gap-3">
+                    {severityCards.map((item) => (
+                      <div key={item.label} className={`rounded-xl border p-4 ${item.className}`}>
+                        <p className="text-2xl font-black leading-none">{item.value}</p>
+                        <p className="text-[10px] uppercase tracking-wider font-bold mt-2">{item.label}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="lg:col-span-5 rounded-xl border border-white/10 bg-white/[0.03] p-5">
+                    <p className="text-xs font-bold text-white uppercase tracking-wider">Recommended Next Action</p>
+                    <p className="text-sm text-muted-foreground leading-relaxed mt-2">
+                      {reportSummary.recommendedNextAction || blockers[0] || 'Review the full report and resolve the highest severity items first.'}
+                    </p>
+                    {reportSummary.policyCategories.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-4">
+                        {reportSummary.policyCategories.slice(0, 5).map((category: string) => (
+                          <span key={category} className="px-2.5 py-1 rounded-full border border-white/10 bg-white/5 text-[10px] font-semibold text-muted-foreground">
+                            {category}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="lg:col-span-6 rounded-xl border border-white/10 bg-white/[0.03] p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <AlertTriangle className="w-4 h-4 text-orange-300" />
+                      <p className="text-xs font-bold text-white uppercase tracking-wider">Top Blockers</p>
+                    </div>
+                    {blockers.length > 0 ? (
+                      <ul className="space-y-3">
+                        {blockers.map((item: string) => (
+                          <li key={item} className="flex gap-3 text-sm text-muted-foreground leading-relaxed">
+                            <span className="mt-2 h-1.5 w-1.5 rounded-full bg-orange-300 shrink-0" />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No blocker list was found in the structured summary.</p>
+                    )}
+                  </div>
+
+                  <div className="lg:col-span-6 rounded-xl border border-white/10 bg-white/[0.03] p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <CheckCircle className="w-4 h-4 text-green-300" />
+                      <p className="text-xs font-bold text-white uppercase tracking-wider">Quick Wins</p>
+                    </div>
+                    {quickWins.length > 0 ? (
+                      <ul className="space-y-3">
+                        {quickWins.map((item: string) => (
+                          <li key={item} className="flex gap-3 text-sm text-muted-foreground leading-relaxed">
+                            <span className="mt-2 h-1.5 w-1.5 rounded-full bg-green-300 shrink-0" />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Quick wins will appear when the report includes low-effort remediation items.</p>
+                    )}
+                  </div>
                 </div>
               </div>
 
