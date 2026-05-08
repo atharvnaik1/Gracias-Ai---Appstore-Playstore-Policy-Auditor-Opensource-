@@ -492,7 +492,7 @@ export async function POST(req: NextRequest) {
     let headers: Record<string, string> = { 'Content-Type': 'application/json' };
     let payload: any = {};
 
-    const VALID_PROVIDERS = new Set(['ipaship', 'anthropic', 'openai', 'gemini', 'openrouter']);
+    const VALID_PROVIDERS = new Set(['ipaship', 'anthropic', 'openai', 'gemini', 'openrouter', 'nvidia']);
     if (!VALID_PROVIDERS.has(provider)) {
       return NextResponse.json({ error: `Invalid provider: ${provider}` }, { status: 400 });
     }
@@ -529,6 +529,19 @@ export async function POST(req: NextRequest) {
       payload = {
         model: model || 'anthropic/claude-3.5-sonnet',
         max_tokens: 16384,
+        stream: true,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+      };
+    } else if (provider === 'nvidia') {
+      // NVIDIA NIM - OpenAI-compatible endpoint
+      apiUrl = 'https://integrate.api.nvidia.com/v1/chat/completions';
+      headers['Authorization'] = `Bearer ${resolvedApiKey.trim()}`;
+      payload = {
+        model: model || 'meta/llama-3.1-405b-instruct',
+        max_tokens: 4096,
         stream: true,
         messages: [
           { role: 'system', content: systemPrompt },
