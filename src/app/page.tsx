@@ -610,90 +610,81 @@ export default function AuditPage() {
     <main className="min-h-[100dvh] w-full bg-background text-foreground selection:bg-primary/30 relative overflow-hidden font-sans">
       {/* No full-screen auth gate — sign-in is only triggered on audit button click */}
 
-      {/* Animated Background */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:32px_32px]" />
-        <motion.div
-          animate={{ scale: [1, 1.2, 1], opacity: [0.15, 0.3, 0.15] }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-[-15%] left-[-15%] w-[600px] h-[600px] bg-primary/20 rounded-full blur-[150px]"
-        />
-        <motion.div
-          animate={{ scale: [1, 1.3, 1], opacity: [0.1, 0.25, 0.1] }}
-          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 2 }}
-          className="absolute bottom-[-15%] right-[-15%] w-[700px] h-[700px] bg-blue-600/15 rounded-full blur-[150px]"
-        />
-        <motion.div
-          animate={{ scale: [1, 1.4, 1], opacity: [0.05, 0.15, 0.05] }}
-          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 4 }}
-          className="absolute top-[40%] left-[50%] w-[400px] h-[400px] bg-green-500/10 rounded-full blur-[120px]"
-        />
+      {/* Precision-lab background */}
+      <div className="fixed inset-0 pointer-events-none z-0 bg-[#050606]">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(244,240,232,0.045)_1px,transparent_1px),linear-gradient(to_bottom,rgba(244,240,232,0.035)_1px,transparent_1px)] bg-[size:48px_48px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_18%,rgba(155,225,93,0.14),transparent_34%),radial-gradient(circle_at_15%_82%,rgba(31,74,255,0.14),transparent_34%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,6,0.2),rgba(5,6,6,0.92))]" />
       </div>
 
-      {/* Security Banner */}
-      <div className="w-full bg-gradient-to-r from-green-500/10 via-primary/5 to-green-500/10 border-b border-green-500/10 text-center py-2.5 px-4 relative z-30 backdrop-blur-md">
-        <p className="text-xs md:text-sm font-medium flex items-center justify-center gap-2">
-          <Lock className="w-3.5 h-3.5 text-green-400" />
-          <span className="text-green-400 font-semibold">Zero-Trust Architecture</span>
-          <span className="text-muted-foreground hidden sm:inline">Your code never touches our servers. BYOK + ephemeral processing.</span>
-        </p>
-      </div>
-
-      {/* Navigation */}
-      <header className="w-full border-b border-white/5 bg-black/30 backdrop-blur-2xl relative z-30 sticky top-0">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 h-14 md:h-16 flex items-center justify-between">
-          <Link href="https://ipaship.com" target="_blank" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-            <div className="bg-gradient-to-br from-primary to-blue-500 w-8 h-8 rounded-xl flex items-center justify-center shadow-lg shadow-primary/25">
-              <Apple className="w-4 h-4 text-white" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-base font-black text-white leading-tight">ipaShip</span>
-              <span className="text-[9px] font-medium text-muted-foreground leading-tight tracking-wider uppercase hidden sm:block">App Store Auditor</span>
-            </div>
-          </Link>
-
-          <nav className="hidden lg:flex items-center gap-6">
-            <div className="flex items-center gap-1">
-              {['About', 'How it Works', 'Security'].map((item) => (
-                <a key={item} href={`#${item.toLowerCase().replace(/\s+/g, '-')}`}
-                  className="px-3 py-2 text-sm font-medium text-muted-foreground hover:text-white hover:bg-white/5 rounded-lg transition-all">
-                  {item}
-                </a>
-              ))}
-            </div>
-          </nav>
-
-          <div className="flex items-center gap-2 md:gap-3">
-            <Link
-              href="https://github.com/atharvnaik1/ipaship-app-reviewer"
-              target="_blank"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 text-xs font-bold text-green-400 transition-all shadow-[0_0_15px_rgba(34,197,94,0.15)]"
-            >
-              <Github className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Star on GitHub</span>
-              {starCount !== null && starCount > 0 && (
-                <>
-                  <Star className="w-3 h-3 text-yellow-500" />
-                  <span className="text-yellow-500">{starCount.toLocaleString()}</span>
-                </>
-              )}
-            </Link>
-            <SignedOut>
-              <button
-                onClick={() => openSignIn()}
-                className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-primary to-blue-600 text-xs font-bold text-white hover:opacity-90 transition-opacity"
-              >
-                Sign In
-              </button>
-            </SignedOut>
-            <SignedIn>
-              <UserButton />
-            </SignedIn>
+      {phase !== 'idle' && phase !== 'error' && (
+        <>
+          {/* Security Banner */}
+          <div className="w-full border-b border-[#f4f0e8]/10 bg-[#050606]/80 text-center py-2.5 px-4 relative z-30 backdrop-blur-xl">
+            <p className="text-xs md:text-sm font-medium flex items-center justify-center gap-2 text-[#8b9691]">
+              <Lock className="w-3.5 h-3.5 text-[#9be15d]" />
+              <span className="text-[#f4f0e8] font-semibold">Private review lab</span>
+              <span className="hidden sm:inline">Ephemeral files. BYOK providers. Open-source path.</span>
+            </p>
           </div>
-        </div>
-      </header>
 
-      <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-6">
+          {/* Navigation */}
+          <header className="w-full border-b border-[#f4f0e8]/10 bg-[#050606]/70 backdrop-blur-2xl relative z-30 sticky top-0">
+            <div className="max-w-7xl mx-auto px-4 md:px-6 h-14 md:h-16 flex items-center justify-between">
+              <Link href="https://ipaship.com" target="_blank" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+                <div className="bg-[#9be15d] w-8 h-8 rounded-lg flex items-center justify-center shadow-[0_0_22px_rgba(155,225,93,0.18)]">
+                  <Apple className="w-4 h-4 text-[#050606]" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-base font-black text-[#f4f0e8] leading-tight">ipaShip</span>
+                  <span className="text-[9px] font-medium text-[#8b9691] leading-tight tracking-wider uppercase hidden sm:block">Review readiness lab</span>
+                </div>
+              </Link>
+
+              <nav className="hidden lg:flex items-center gap-6">
+                <div className="flex items-center gap-1">
+                  {['Audit', 'Security', 'Open Source'].map((item) => (
+                    <a key={item} href={`#${item.toLowerCase().replace(/\s+/g, '-')}`}
+                      className="px-3 py-2 text-sm font-medium text-[#8b9691] hover:text-[#f4f0e8] transition-all">
+                      {item}
+                    </a>
+                  ))}
+                </div>
+              </nav>
+
+              <div className="flex items-center gap-2 md:gap-3">
+                <Link
+                  href="https://github.com/atharvnaik1/ipaship-app-reviewer"
+                  target="_blank"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#f4f0e8]/15 text-xs font-bold text-[#f4f0e8] hover:border-[#9be15d]/50 hover:text-[#9be15d] transition-all"
+                >
+                  <Github className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Star on GitHub</span>
+                  {starCount !== null && starCount > 0 && (
+                    <>
+                      <Star className="w-3 h-3 text-yellow-500" />
+                      <span className="text-yellow-500">{starCount.toLocaleString()}</span>
+                    </>
+                  )}
+                </Link>
+                <SignedOut>
+                  <button
+                    onClick={() => openSignIn()}
+                    className="px-3 py-1.5 rounded-lg bg-[#9be15d] text-xs font-bold text-[#050606] hover:bg-[#b7f278] transition-colors"
+                  >
+                    Sign In
+                  </button>
+                </SignedOut>
+                <SignedIn>
+                  <UserButton />
+                </SignedIn>
+              </div>
+            </div>
+          </header>
+        </>
+      )}
+
+      <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-6">
         <AnimatePresence mode="wait">
           {/* ═══════════════ IDLE / ERROR STATE ═══════════════ */}
           {(phase === 'idle' || phase === 'error') && (
@@ -704,442 +695,205 @@ export default function AuditPage() {
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.5 }}
             >
-              {/* Hero Section */}
-              <div className="text-center pt-12 md:pt-20 pb-10 md:pb-16">
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
+              <section id="audit" className="pt-4 md:pt-6">
+                <div
+                  className={`relative overflow-hidden border border-[#f4f0e8]/10 bg-[#050606] shadow-[0_38px_120px_rgba(0,0,0,0.55)] transition-colors ${isDragging ? 'border-[#9be15d]/70' : ''}`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
+                  <img
+                    src="/images/ipaship-hero-home.png"
+                    alt="ipaShip app review audit hero"
+                    className="block w-full select-none"
+                    draggable={false}
+                  />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".ipa,.apk,.zip"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="absolute right-[4.2%] bottom-[7.5%] hidden h-[18%] w-[36%] rounded-xl outline-none transition-colors hover:bg-[#9be15d]/5 focus-visible:bg-[#9be15d]/10 focus-visible:ring-2 focus-visible:ring-[#9be15d] md:block"
+                    aria-label="Upload app bundle"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => file ? handleRunAudit() : fileInputRef.current?.click()}
+                    disabled={isUploading || (!!file && !isReady)}
+                    className="absolute left-[4.6%] bottom-[7%] hidden h-[7.2%] w-[15.5%] rounded-lg outline-none transition-colors hover:bg-[#9be15d]/10 focus-visible:ring-2 focus-visible:ring-[#9be15d] md:block disabled:cursor-not-allowed"
+                    aria-label={file ? 'Run audit' : 'Select app bundle'}
+                  />
+                  <Link
+                    href="https://github.com/atharvnaik1/ipaship-app-reviewer"
+                    target="_blank"
+                    className="absolute left-[22.6%] bottom-[8.2%] hidden h-[5.8%] w-[7.8%] rounded-md outline-none transition-colors hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-[#9be15d] md:block"
+                    aria-label="Open ipaShip source on GitHub"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#9be15d] px-4 py-3 text-sm font-black text-[#050606] transition-colors hover:bg-[#b7f278] md:hidden"
+                >
+                  <Upload className="h-4 w-4" />
+                  Upload app bundle
+                </button>
+              </section>
+
+              {(file || uploadError || errorMessage || isUploading) && (
+                <motion.section
+                  initial={{ opacity: 0, y: -8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 }}
-                  className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-xs font-semibold text-primary mb-6"
+                  className="mx-auto mt-4 max-w-5xl rounded-2xl border border-[#f4f0e8]/12 bg-[#090c0b]/95 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.42)] backdrop-blur-xl md:p-5"
                 >
-                  <Zap className="w-3.5 h-3.5" />
-                  AI-Powered Compliance Auditing for iOS
-                </motion.div>
+                  <div className="grid gap-4 lg:grid-cols-[1.3fr_0.9fr_0.8fr] lg:items-end">
+                    <div className="min-w-0">
+                      <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.22em] text-[#9be15d]">Audit controls</p>
+                      {file ? (
+                        <div className="flex min-w-0 items-center gap-3 rounded-xl border border-[#f4f0e8]/10 bg-[#f4f0e8]/[0.035] p-3">
+                          <div className={`shrink-0 rounded-lg border p-2 ${uploadError ? 'border-red-500/20 bg-red-500/10' : 'border-[#9be15d]/25 bg-[#9be15d]/10'}`}>
+                            {isUploading ? <Loader2 className="h-5 w-5 animate-spin text-[#9be15d]" /> : uploadError ? <AlertTriangle className="h-5 w-5 text-red-400" /> : <FileArchive className="h-5 w-5 text-[#9be15d]" />}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-[#f4f0e8]">{file.name}</p>
+                            <p className="text-xs text-[#8b9691]">{formatFileSize(file.size)}{isUploading ? ` · Uploading ${uploadProgress}%` : uploadedFileId ? ' · Upload complete' : ''}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => { setFile(null); setUploadedFileId(null); setUploadProgress(0); setUploadSpeed(''); setUploadError(''); setIsUploading(false); setIsAutoAnalyzing(false); autoTriggeredFileIdRef.current = null; }}
+                            className="rounded-lg border border-red-500/20 bg-red-500/10 p-2 text-red-300 transition-colors hover:bg-red-500/20"
+                            aria-label="Remove selected file"
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#f4f0e8]/18 bg-[#f4f0e8]/[0.025] px-4 py-4 text-sm font-semibold text-[#f4f0e8] transition-colors hover:border-[#9be15d]/45 hover:bg-[#9be15d]/5 md:hidden"
+                        >
+                          <Upload className="h-4 w-4 text-[#9be15d]" />
+                          Upload app bundle
+                        </button>
+                      )}
+                    </div>
 
-                <motion.h1
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                  className="text-4xl md:text-6xl lg:text-7xl font-black tracking-tight mb-6 drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]"
-                >
-                  <span className="text-white">Audit Your iOS App</span>
-                  <br />
-                  <span className="text-white">Before </span>
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#a78bfa] via-[#818cf8] to-[#60a5fa] [-webkit-text-stroke:0.5px_rgba(255,255,255,0.1)]">Apple Does</span>
-                </motion.h1>
-
-                <motion.p
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
-                  className="text-muted-foreground text-base md:text-xl max-w-2xl mx-auto leading-relaxed mb-4"
-                >
-                  Upload your iOS project and get a comprehensive audit against Apple&apos;s Review Guidelines.
-                  Catch rejection risks before you submit.
-                </motion.p>
-
-                {/* Trust indicators */}
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.5 }}
-                  className="flex items-center justify-center gap-6 text-xs text-muted-foreground mt-6"
-                >
-                  <span className="flex items-center gap-1.5"><Lock className="w-3 h-3 text-green-400" /> Zero data storage</span>
-                  <span className="flex items-center gap-1.5"><Code2 className="w-3 h-3 text-blue-400" /> Open source</span>
-                  <span className="flex items-center gap-1.5"><Clock className="w-3 h-3 text-amber-400" /> Results in ~60s</span>
-                </motion.div>
-
-                {/* AI Provider Logos */}
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.6 }}
-                  className="mt-8 flex flex-col items-center gap-3"
-                >
-                  <span className="text-[11px] uppercase tracking-widest text-muted-foreground/60 font-medium">Powered by</span>
-                  <div className="flex items-center justify-center gap-6 md:gap-8">
-                    <img src="/logos/gemini.svg" alt="Gemini" className="h-7 w-7 opacity-60 hover:opacity-100 transition-opacity" draggable={false} />
-                    <img src="/logos/openai.svg" alt="OpenAI" className="h-7 w-7 opacity-60 hover:opacity-100 transition-opacity" draggable={false} />
-                    <img src="/logos/anthropic.svg" alt="Anthropic" className="h-7 w-7 opacity-60 hover:opacity-100 transition-opacity" draggable={false} />
-                    <img src="/logos/openrouter.svg" alt="OpenRouter" className="h-7 w-7 opacity-60 hover:opacity-100 transition-opacity" draggable={false} />
-                  </div>
-                </motion.div>
-              </div>
-
-              {/* Main Audit Form */}
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="max-w-4xl mx-auto"
-              >
-                <div className="glassmorphism rounded-3xl p-6 md:p-8 border border-white/10 shadow-2xl shadow-primary/5">
-                  <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                    {/* Upload Area — spans 3 cols */}
-                    <div className="lg:col-span-3">
-                      <div
-                        onDragOver={handleDragOver}
-                        onDragLeave={handleDragLeave}
-                        onDrop={handleDrop}
-                        onClick={() => fileInputRef.current?.click()}
-                        className={`relative cursor-pointer rounded-2xl overflow-hidden transition-all duration-300 h-full min-h-[200px] md:min-h-[240px] flex flex-col items-center justify-center group border-2 border-dashed ${isDragging
-                          ? 'border-primary bg-primary/5'
-                          : file
-                            ? 'border-green-500/50 bg-green-500/5'
-                            : 'border-white/10 hover:border-primary/30 hover:bg-white/[0.02]'
-                          }`}
+                    <div className="grid grid-cols-2 gap-3">
+                      <select
+                        value={provider}
+                        onChange={(e) => {
+                          const p = e.target.value;
+                          setProvider(p);
+                          setModel(providerModels[p][0].value);
+                        }}
+                        className="w-full rounded-lg border border-[#f4f0e8]/10 bg-[#f4f0e8]/5 px-3 py-2.5 text-xs font-medium text-[#f4f0e8] outline-none transition-colors hover:bg-[#f4f0e8]/[0.08] focus:ring-1 focus:ring-[#9be15d]/50"
+                        style={selectStyle}
+                        aria-label="AI provider"
                       >
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept=".ipa,.apk,.zip"
-                          onChange={handleFileSelect}
-                          className="hidden"
-                        />
-                        <div className="p-6 flex flex-col items-center justify-center text-center w-full">
-                          {file ? (
-                            <motion.div
-                              initial={{ scale: 0.9, opacity: 0 }}
-                              animate={{ scale: 1, opacity: 1 }}
-                              className="flex flex-col items-center gap-3 w-full"
-                            >
-                              <div className={`p-3 rounded-2xl border ${isUploading ? 'bg-primary/10 border-primary/20' : uploadError ? 'bg-red-500/10 border-red-500/20' : 'bg-green-500/10 border-green-500/20'}`}>
-                                {isUploading
-                                  ? <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                                  : uploadError
-                                    ? <AlertTriangle className="w-8 h-8 text-red-400" />
-                                    : <FileArchive className="w-8 h-8 text-green-400" />
-                                }
-                              </div>
-                              <div className="w-full">
-                                <p className="text-white font-semibold text-sm md:text-base break-all line-clamp-1 max-w-[280px] mx-auto">{file.name}</p>
-                                <p className="text-muted-foreground text-xs mt-1">{formatFileSize(file.size)}</p>
-                              </div>
-                              {isUploading && (
-                                <div className="w-full max-w-[240px] space-y-1.5">
-                                  <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
-                                    <motion.div
-                                      className="h-full rounded-full bg-gradient-to-r from-primary to-blue-500"
-                                      initial={{ width: '0%' }}
-                                      animate={{ width: `${uploadProgress}%` }}
-                                      transition={{ ease: 'linear', duration: 0.3 }}
-                                    />
-                                  </div>
-                                  <div className="flex justify-between items-center text-[10px]">
-                                    <span className="text-primary font-bold">{uploadProgress}%</span>
-                                    {uploadSpeed && <span className="text-muted-foreground">{uploadSpeed}</span>}
-                                  </div>
-                                </div>
-                              )}
-                              {uploadError && (
-                                <p className="text-red-400 text-[10px] text-center max-w-[220px]">{uploadError}</p>
-                              )}
-                              {!isUploading && !uploadError && uploadedFileId && (
-                                <span className={`text-[10px] font-semibold flex items-center gap-1 ${isAutoAnalyzing ? 'text-primary' : 'text-green-400'}`}>
-                                  {isAutoAnalyzing
-                                    ? <><Loader2 className="w-3 h-3 animate-spin" /> Analyzing your code…</>
-                                    : <><CheckCircle className="w-3 h-3" /> Upload complete — starting analysis</>
-                                  }
-                                </span>
-                              )}
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setFile(null); setUploadedFileId(null); setUploadProgress(0); setUploadSpeed(''); setUploadError(''); setIsUploading(false); setIsAutoAnalyzing(false); autoTriggeredFileIdRef.current = null; }}
-                                className="px-3 py-1.5 text-xs font-medium text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-lg transition-all flex items-center gap-1.5"
-                              >
-                                <XCircle className="w-3.5 h-3.5" /> Remove
-                              </button>
-                            </motion.div>
-                          ) : (
-                            <div className="flex flex-col items-center">
-                              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 mb-4 group-hover:border-primary/20 group-hover:bg-primary/5 transition-all">
-                                <Upload className="w-7 h-7 text-muted-foreground group-hover:text-primary transition-colors" />
-                              </div>
-                              <p className="text-white font-semibold text-sm md:text-base mb-1">
-                                Drop your app bundle here
-                              </p>
-                              <p className="text-muted-foreground text-xs mb-3">
-                                <span className="text-primary">.ipa, .apk, .zip</span> files up to 150MB
-                              </p>
-                              <span className="text-[10px] text-muted-foreground/60 font-medium">
-                                .swift, .m, .plist, .entitlements, .storyboard &amp; more
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                        <option value="ipaship">ipaShip AI</option>
+                        <option value="anthropic">Anthropic</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="gemini">Gemini</option>
+                        <option value="openrouter">OpenRouter</option>
+                      </select>
+                      <select
+                        value={model}
+                        onChange={(e) => setModel(e.target.value)}
+                        className="w-full rounded-lg border border-[#f4f0e8]/10 bg-[#f4f0e8]/5 px-3 py-2.5 text-xs font-medium text-[#c9d0cb] outline-none transition-colors hover:bg-[#f4f0e8]/[0.08] focus:ring-1 focus:ring-[#9be15d]/50"
+                        style={selectStyle}
+                        aria-label="AI model"
+                      >
+                        {providerModels[provider]?.map((m) => (
+                          <option key={m.value} value={m.value}>{m.label}</option>
+                        ))}
+                      </select>
                     </div>
 
-                    {/* Config Area — spans 2 cols */}
-                    <div className="lg:col-span-2 flex flex-col gap-4">
-                      {/* Provider + Model */}
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Cpu className="w-3.5 h-3.5 text-primary" />
-                          <span className="text-xs font-semibold text-white">AI Provider</span>
-                        </div>
-                        <select
-                          value={provider}
-                          onChange={(e) => {
-                            const p = e.target.value;
-                            setProvider(p);
-                            setModel(providerModels[p][0].value);
-                          }}
-                          className="w-full bg-white/5 border border-white/10 text-xs text-white font-medium px-3 py-2.5 rounded-xl outline-none focus:ring-1 focus:ring-primary/50 appearance-none cursor-pointer hover:bg-white/[0.08] transition-colors"
-                          style={selectStyle}
-                        >
-                          <option value="ipaship">ipaShip AI</option>
-                          <option value="anthropic">Anthropic (Claude)</option>
-                          <option value="openai">OpenAI (GPT)</option>
-                          <option value="gemini">Google Gemini</option>
-                          <option value="openrouter">OpenRouter</option>
-                        </select>
-                        <select
-                          value={model}
-                          onChange={(e) => setModel(e.target.value)}
-                          className="w-full bg-white/5 border border-white/10 text-xs text-muted-foreground font-medium px-3 py-2.5 rounded-xl outline-none focus:ring-1 focus:ring-blue-500/50 appearance-none cursor-pointer hover:bg-white/[0.08] transition-colors"
-                          style={selectStyle}
-                        >
-                          {providerModels[provider]?.map((m) => (
-                            <option key={m.value} value={m.value}>{m.label}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* API Key */}
-
-                      {/* Context */}
-                      <div className="flex-1 flex flex-col space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Info className="w-3.5 h-3.5 text-blue-400" />
-                          <span className="text-xs font-semibold text-white">Context <span className="text-muted-foreground font-normal">(optional)</span></span>
-                        </div>
-                        <textarea
-                          value={context}
-                          onChange={(e) => setContext(e.target.value)}
-                          placeholder="e.g., Health & Fitness category, uses HealthKit, has auto-renewable subscriptions..."
-                          className="w-full flex-1 min-h-[60px] bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all resize-none custom-scrollbar"
-                        />
-                      </div>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRunAudit}
+                      disabled={!isReady || isUploading}
+                      className={`rounded-xl px-4 py-3 text-sm font-black transition-all ${isReady && !isUploading
+                        ? 'bg-[#9be15d] text-[#050606] hover:bg-[#b7f278]'
+                        : 'cursor-not-allowed border border-[#f4f0e8]/8 bg-[#f4f0e8]/5 text-[#8b9691]/70'
+                        }`}
+                    >
+                      {isUploading ? `Uploading ${uploadProgress}%` : 'Run audit'}
+                    </button>
                   </div>
 
-                  {/* Error */}
+                  <textarea
+                    value={context}
+                    onChange={(e) => setContext(e.target.value)}
+                    placeholder="Optional context: category, subscriptions, HealthKit, review notes..."
+                    className="mt-3 min-h-[64px] w-full resize-none rounded-xl border border-[#f4f0e8]/10 bg-[#f4f0e8]/5 px-3 py-2.5 text-xs text-[#f4f0e8] outline-none transition-all placeholder:text-[#8b9691]/60 focus:border-[#9be15d]/50 focus:ring-1 focus:ring-[#9be15d]/50"
+                  />
+
                   <AnimatePresence>
-                    {errorMessage && (
+                    {(uploadError || errorMessage) && (
                       <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="overflow-hidden mt-4"
+                        className="overflow-hidden"
                       >
-                        <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-3 flex items-center gap-3">
-                          <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-                          <p className="text-red-300 text-xs">{errorMessage}</p>
+                        <div className="mt-3 flex items-center gap-3 rounded-xl border border-red-500/20 bg-red-500/10 p-3">
+                          <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" />
+                          <p className="text-xs text-red-300">{uploadError || errorMessage}</p>
                         </div>
                       </motion.div>
                     )}
                   </AnimatePresence>
+                </motion.section>
+              )}
 
-                  {/* Submit */}
-                  <div className="mt-6">
-                    <button
-                      onClick={handleRunAudit}
-                      disabled={!isReady || isUploading}
-                      className={`relative w-full py-3.5 md:py-4 rounded-2xl font-bold text-sm md:text-base flex items-center justify-center gap-2.5 transition-all duration-300 overflow-hidden ${isReady && !isUploading
-                        ? 'bg-gradient-to-r from-primary to-blue-600 text-white shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:scale-[1.01] active:scale-[0.99]'
-                        : 'bg-white/5 text-muted-foreground/50 cursor-not-allowed border border-white/5'
-                        }`}
-                    >
-                      {isUploading
-                        ? <><Loader2 className="w-5 h-5 animate-spin" /> Uploading… {uploadProgress}%</>
-                        : <><ShieldCheck className="w-5 h-5" /> Run Compliance Audit</>
-                      }
-                    </button>
-                  </div>
+              <section id="about" className="mt-8 md:mt-12">
+                <img
+                  src="/images/ipaship-readiness-section.png"
+                  alt="ipaShip review readiness report section"
+                  className="block w-full border border-[#f4f0e8]/10 bg-[#050606] shadow-[0_34px_110px_rgba(0,0,0,0.42)]"
+                  draggable={false}
+                />
+              </section>
+
+              <section id="security" className="mt-8 md:mt-12">
+                <img
+                  src="/images/ipaship-workflow-section.png"
+                  alt="ipaShip workflow and security section"
+                  className="block w-full border border-[#f4f0e8]/10 bg-[#050606] shadow-[0_34px_110px_rgba(0,0,0,0.42)]"
+                  draggable={false}
+                />
+              </section>
+
+              <section id="open-source" className="my-8 md:my-12">
+                <div className="relative">
+                  <img
+                    src="/images/ipaship-cta-section.png"
+                    alt="ipaShip know before you submit call to action"
+                    className="block w-full border border-[#f4f0e8]/10 bg-[#050606] shadow-[0_34px_110px_rgba(0,0,0,0.42)]"
+                    draggable={false}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => file ? handleRunAudit() : fileInputRef.current?.click()}
+                    disabled={isUploading || (!!file && !isReady)}
+                    className="absolute left-[5.2%] top-[59.5%] hidden h-[9%] w-[19.2%] rounded-lg outline-none transition-colors hover:bg-[#9be15d]/10 focus-visible:ring-2 focus-visible:ring-[#9be15d] md:block disabled:cursor-not-allowed"
+                    aria-label={file ? 'Run audit' : 'Start audit'}
+                  />
+                  <Link
+                    href="https://github.com/atharvnaik1/ipaship-app-reviewer"
+                    target="_blank"
+                    className="absolute left-[28%] top-[61%] hidden h-[6.5%] w-[8.5%] rounded-md outline-none transition-colors hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-[#9be15d] md:block"
+                    aria-label="Open ipaShip source on GitHub"
+                  />
                 </div>
-              </motion.div>
-
-              {/* Feature Cards */}
-              <div id="about" className="mt-20 md:mt-28">
-                <div className="text-center mb-12">
-                  <h2 className="text-3xl md:text-4xl font-black text-white mb-3">Why ipaShip?</h2>
-                  <p className="text-muted-foreground text-sm md:text-base max-w-xl mx-auto">Stop guessing if your app will pass review. Get definitive answers before you submit.</p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
-                  {[
-                    {
-                      icon: <ShieldCheck className="w-5 h-5 text-primary" />,
-                      iconBg: 'bg-primary/10 border-primary/20',
-                      title: 'Full Guidelines Coverage',
-                      desc: 'Checks all 6 major App Store Review Guideline categories: Safety, Performance, Business, Design, Legal & Privacy, and Technical.',
-                    },
-                    {
-                      icon: <Zap className="w-5 h-5 text-amber-400" />,
-                      iconBg: 'bg-amber-500/10 border-amber-500/20',
-                      title: 'Real-Time Streaming',
-                      desc: 'Watch your audit report generate live. Results stream in real-time so you can start reading while the analysis continues.',
-                    },
-                    {
-                      icon: <Lock className="w-5 h-5 text-green-400" />,
-                      iconBg: 'bg-green-500/10 border-green-500/20',
-                      title: 'Zero Trust Security',
-                      desc: 'Your code is processed in ephemeral temp storage and deleted immediately. API keys stay in your browser, never on our servers.',
-                    },
-                    {
-                      icon: <Code2 className="w-5 h-5 text-blue-400" />,
-                      iconBg: 'bg-blue-500/10 border-blue-500/20',
-                      title: '100% Open Source',
-                      desc: 'Every line of code is public on GitHub. Inspect exactly how your data is handled, or contribute improvements.',
-                    },
-                    {
-                      icon: <Cpu className="w-5 h-5 text-purple-400" />,
-                      iconBg: 'bg-purple-500/10 border-purple-500/20',
-                      title: 'Multi-Provider BYOK',
-                      desc: 'Bring your own key from Anthropic, OpenAI, Google Gemini, or OpenRouter. Choose the model that works best for you.',
-                    },
-                    {
-                      icon: <FileText className="w-5 h-5 text-cyan-400" />,
-                      iconBg: 'bg-cyan-500/10 border-cyan-500/20',
-                      title: 'Actionable Reports',
-                      desc: 'Get a prioritized remediation plan with severity ratings, exact file paths, and effort estimates. Export as PDF or Markdown.',
-                    },
-                  ].map((card, i) => (
-                    <motion.div
-                      key={card.title}
-                      initial={{ opacity: 0, y: 20 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ delay: i * 0.08 }}
-                      className="p-5 md:p-6 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 hover:bg-white/[0.04] transition-all group"
-                    >
-                      <div className={`w-10 h-10 ${card.iconBg} border rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                        {card.icon}
-                      </div>
-                      <h3 className="text-white font-bold text-sm mb-2">{card.title}</h3>
-                      <p className="text-muted-foreground text-xs leading-relaxed">{card.desc}</p>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-
-              {/* How it Works */}
-              <div id="how-it-works" className="mt-20 md:mt-28">
-                <div className="text-center mb-12">
-                  <h2 className="text-3xl md:text-4xl font-black text-white mb-3">Three Steps to Compliance</h2>
-                  <p className="text-muted-foreground text-sm md:text-base max-w-xl mx-auto">From upload to actionable results in under a minute.</p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {[
-                    {
-                      step: '01',
-                      color: 'from-primary to-purple-600',
-                      title: 'Upload Your Project',
-                      desc: 'Drop your .ipa file and we extract all relevant iOS source files while skipping compiled binaries and build artifacts.',
-                      icon: <Upload className="w-5 h-5" />,
-                    },
-                    {
-                      step: '02',
-                      color: 'from-blue-500 to-cyan-500',
-                      title: 'AI Analyzes Your Code',
-                      desc: 'Your code is sent directly to your chosen AI provider using your API key. We act as a secure passthrough, nothing stored.',
-                      icon: <Cpu className="w-5 h-5" />,
-                    },
-                    {
-                      step: '03',
-                      color: 'from-green-500 to-emerald-500',
-                      title: 'Get Your Audit Report',
-                      desc: 'Receive a comprehensive compliance report with pass/fail indicators, severity ratings, and a prioritized fix list.',
-                      icon: <CheckCircle className="w-5 h-5" />,
-                    },
-                  ].map((item, i) => (
-                    <motion.div
-                      key={item.step}
-                      initial={{ opacity: 0, y: 20 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ delay: i * 0.15 }}
-                      className="relative p-6 md:p-8 rounded-2xl bg-white/[0.02] border border-white/5 overflow-hidden group hover:border-white/10 transition-all"
-                    >
-                      <div className="absolute top-4 right-4 text-5xl md:text-6xl font-black text-white/[0.03] group-hover:text-white/[0.06] transition-colors select-none">{item.step}</div>
-                      <div className={`w-10 h-10 bg-gradient-to-br ${item.color} rounded-xl flex items-center justify-center mb-5 text-white shadow-lg`}>
-                        {item.icon}
-                      </div>
-                      <h3 className="text-white font-bold text-base mb-2">{item.title}</h3>
-                      <p className="text-muted-foreground text-sm leading-relaxed">{item.desc}</p>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Security Section */}
-              <div id="security" className="mt-20 md:mt-28 mb-16">
-                <div className="rounded-3xl border border-white/5 bg-gradient-to-br from-green-500/5 via-transparent to-primary/5 p-8 md:p-12 overflow-hidden relative">
-                  <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-green-500/30 to-transparent" />
-
-                  <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12">
-                    <div className="shrink-0">
-                      <div className="relative">
-                        <div className="absolute inset-0 bg-green-500/20 blur-[50px] rounded-full" />
-                        <div className="w-28 h-28 md:w-36 md:h-36 border border-green-500/20 bg-black/50 rounded-full flex items-center justify-center relative backdrop-blur-md">
-                          <ShieldCheck className="w-14 h-14 md:w-18 md:h-18 text-green-400" />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <h2 className="text-2xl md:text-3xl font-black text-white mb-4">Enterprise-Grade Security</h2>
-                      <p className="text-muted-foreground text-sm md:text-base mb-6 leading-relaxed max-w-2xl">
-                        Your source code is your most valuable IP. Every architectural decision we made prioritizes your security.
-                      </p>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        {[
-                          { title: 'No Cloud Storage', desc: 'Files are processed in ephemeral temp directories and deleted immediately after audit.' },
-                          { title: 'Bring Your Own Key', desc: 'Your API key goes directly to your AI provider. We never store or log it.' },
-                          { title: 'Fully Auditable', desc: 'Read every line of our open-source code on GitHub. Full transparency.' },
-                        ].map((item) => (
-                          <div key={item.title} className="flex gap-3">
-                            <CheckCircle className="w-4 h-4 text-green-400 shrink-0 mt-0.5" />
-                            <div>
-                              <p className="text-white text-sm font-semibold mb-1">{item.title}</p>
-                              <p className="text-muted-foreground text-xs leading-relaxed">{item.desc}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Footer */}
-              <footer className="border-t border-white/5 py-8 md:py-10">
-                <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <Link href="https://ipaship.com" target="_blank" className="flex items-center gap-2 text-sm font-bold text-white hover:opacity-80 transition-opacity">
-                      <div className="bg-gradient-to-br from-primary to-blue-600 w-5 h-5 rounded flex items-center justify-center">
-                        <Apple className="w-2.5 h-2.5 text-white" />
-                      </div>
-                      ipaShip
-                    </Link>
-                    <span className="text-xs text-muted-foreground">&copy; {new Date().getFullYear()}</span>
-                    {visitorCount !== null && (
-                      <span className="text-xs text-muted-foreground">{visitorCount.toLocaleString()} visitors</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <a href="https://ipaship.com/privacy" className="hover:text-white transition-colors">Privacy</a>
-                    <a href="https://ipaship.com/about" className="hover:text-white transition-colors">About</a>
-                    <a href="mailto:hello@ipaship.com" className="hover:text-white transition-colors">Contact</a>
-                    <a href="https://github.com/atharvnaik1/ipaship-app-reviewer" className="flex items-center gap-1 hover:text-white transition-colors">
-                      Source <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </div>
-                </div>
-              </footer>
+              </section>
             </motion.div>
           )}
 
