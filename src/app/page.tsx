@@ -7,7 +7,8 @@ import {
   ChevronDown, Download, ArrowLeft,
   ShieldCheck, AlertTriangle, CheckCircle, XCircle,
   FileText, Sparkles, Info, Github, ExternalLink, Building2, Star, Mail,
-  Zap, Lock, Code2, Clock, Apple, Cpu
+  Zap, Lock, Code2, Clock, Apple, Cpu,
+  type LucideIcon
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -57,6 +58,78 @@ const selectStyle = {
   backgroundRepeat: 'no-repeat' as const,
   backgroundPosition: 'right 8px center',
   paddingRight: '24px',
+};
+
+type MetricProp = {
+  label: string;
+  value: string;
+};
+
+type IssueProp = {
+  title: string;
+  severity: 'Critical' | 'Major' | 'Minor';
+};
+
+type WorkflowStepProp = {
+  step: string;
+  title: string;
+  body: string;
+};
+
+type SecurityProp = {
+  title: string;
+  description: string;
+  icon: LucideIcon;
+};
+
+const readinessSection = {
+  eyebrow: '02 / 04',
+  title: 'Know what will',
+  accent: 'block',
+  titleSuffix: 'review',
+  description: 'One pass turns a raw bundle into the score, blockers, and fix plan your release team needs.',
+  panelTitle: 'Review readiness in one view.',
+  score: '82',
+  metrics: [
+    { value: '3', label: 'Blockers' },
+    { value: '4', label: 'Quick wins' },
+    { value: '1', label: 'Fix plan' },
+  ] satisfies MetricProp[],
+  issues: [
+    { title: 'Privacy permissions', severity: 'Critical' },
+    { title: 'Metadata gap', severity: 'Major' },
+    { title: 'Accessibility label', severity: 'Minor' },
+  ] satisfies IssueProp[],
+  summary: [
+    { label: 'Score', value: '82/100' },
+    { label: 'Verdict', value: 'Caveats' },
+    { label: 'Export', value: 'Checklist' },
+  ] satisfies MetricProp[],
+};
+
+const workflowSection = {
+  eyebrow: '03 / 04',
+  label: 'Workflow & Security',
+  title: 'From bundle to fix plan',
+  description: 'Every upload becomes a private, source-grounded review brief your team can act on.',
+  steps: [
+    { step: '01', title: 'Upload', body: '.ipa' },
+    { step: '02', title: 'Extract', body: 'Info.plist\nAppDelegate.swift\nEntitlements.plist' },
+    { step: '03', title: 'Audit', body: 'readiness lens' },
+    { step: '04', title: 'Fix', body: 'Issues\nEvidence\nRemediation' },
+  ] satisfies WorkflowStepProp[],
+  security: [
+    { title: 'Ephemeral files', description: 'Files exist only for the duration of your review and are securely wiped after.', icon: Lock },
+    { title: 'BYOK providers', description: 'Bring your own keys with AWS KMS, GCP KMS, Azure Key Vault, or HashiCorp Vault.', icon: Key },
+    { title: 'Open-source path', description: 'Core analysis engine is open source. Run it anywhere, inspect everything.', icon: Code2 },
+  ] satisfies SecurityProp[],
+};
+
+const ctaSection = {
+  title: 'Know before you submit',
+  description: 'Run a private review pass and leave with the fixes that matter.',
+  primary: 'Start audit',
+  secondary: 'GitHub',
 };
 
 export default function AuditPage() {
@@ -695,54 +768,93 @@ export default function AuditPage() {
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.5 }}
             >
-              <section id="audit" className="pt-4 md:pt-6">
-                <div
-                  className={`relative overflow-hidden border border-[#f4f0e8]/10 bg-[#050606] shadow-[0_38px_120px_rgba(0,0,0,0.55)] transition-colors ${isDragging ? 'border-[#9be15d]/70' : ''}`}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                >
-                  <img
-                    src="/images/ipaship-hero-home.png"
-                    alt="ipaShip app review audit hero"
-                    className="block w-full select-none"
-                    draggable={false}
-                  />
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".ipa,.apk,.zip"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                  />
+              <section
+                id="audit"
+                className="relative mt-4 min-h-[700px] overflow-hidden border border-[#f4f0e8]/10 bg-[#050606] shadow-[0_38px_120px_rgba(0,0,0,0.55)] md:mt-6 md:min-h-[760px]"
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                <img
+                  src="/images/ipaship-bg-hero.png"
+                  alt=""
+                  aria-hidden="true"
+                  className="absolute inset-0 h-full w-full object-cover opacity-90"
+                  draggable={false}
+                />
+                <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,6,6,0.92)_0%,rgba(5,6,6,0.68)_37%,rgba(5,6,6,0.2)_70%,rgba(5,6,6,0.08)_100%)]" />
+                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,6,0.35),rgba(5,6,6,0.06)_48%,rgba(5,6,6,0.55))]" />
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".ipa,.apk,.zip"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+
+                <header className="relative z-10 flex h-20 items-center justify-between border-b border-[#f4f0e8]/14 px-6 md:px-10">
+                  <Link href="https://ipaship.com" target="_blank" className="text-2xl font-black tracking-[-0.04em] text-[#f4f0e8] transition-colors hover:text-[#9be15d]">
+                    ipaShip
+                  </Link>
+                  <nav className="hidden items-center gap-12 text-sm font-medium text-[#c9d0cb]/72 md:flex">
+                    <a href="#audit" className="transition-colors hover:text-[#f4f0e8]">Audit</a>
+                    <a href="#security" className="transition-colors hover:text-[#f4f0e8]">Security</a>
+                    <a href="#open-source" className="transition-colors hover:text-[#f4f0e8]">Open Source</a>
+                    <span className="h-8 w-px bg-[#f4f0e8]/20" />
+                    <span className="grid h-7 w-7 place-items-center rounded-full border border-[#f4f0e8]/25">
+                      <span className="h-2 w-2 rounded-full bg-[#9be15d] shadow-[0_0_18px_rgba(155,225,93,0.75)]" />
+                    </span>
+                  </nav>
+                </header>
+
+                <div className="relative z-10 flex min-h-[620px] flex-col justify-end px-6 pb-10 md:px-10 md:pb-12">
+                  <div className="max-w-[640px]">
+                    <h1 className="max-w-[560px] text-[clamp(4rem,9vw,6.6rem)] font-normal leading-[0.94] tracking-[-0.055em] text-[#f4f0e8]">
+                      Ship before review day
+                    </h1>
+                    <p className="mt-6 max-w-[470px] text-lg leading-relaxed text-[#c9d0cb]/78 md:text-xl">
+                      Audit your app bundle, surface rejection risks, and leave with a fix plan.
+                    </p>
+                    <div className="mt-8 flex flex-wrap items-center gap-7">
+                      <button
+                        type="button"
+                        onClick={() => file ? handleRunAudit() : fileInputRef.current?.click()}
+                        disabled={isUploading || (!!file && !isReady)}
+                        className="inline-flex min-w-[210px] items-center justify-center gap-5 rounded-md bg-[#9be15d] px-7 py-4 text-lg font-medium text-[#050606] transition-colors hover:bg-[#b7f278] disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {file ? 'Run audit' : 'Run audit'}
+                        <span className="text-3xl leading-none">→</span>
+                      </button>
+                      <Link
+                        href="https://github.com/atharvnaik1/ipaship-app-reviewer"
+                        target="_blank"
+                        className="text-lg font-medium text-[#f4f0e8] underline decoration-[#f4f0e8]/70 underline-offset-8 transition-colors hover:text-[#9be15d]"
+                      >
+                        View source
+                      </Link>
+                    </div>
+                  </div>
+
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="absolute right-[4.2%] bottom-[7.5%] hidden h-[18%] w-[36%] rounded-xl outline-none transition-colors hover:bg-[#9be15d]/5 focus-visible:bg-[#9be15d]/10 focus-visible:ring-2 focus-visible:ring-[#9be15d] md:block"
+                    className={`mt-10 flex w-full items-center gap-5 rounded-xl border bg-[#08100e]/58 p-5 text-left backdrop-blur-md transition-all hover:border-[#9be15d]/60 hover:bg-[#0b1511]/72 md:absolute md:bottom-10 md:right-10 md:mt-0 md:w-[460px] ${isDragging ? 'border-[#9be15d]' : 'border-[#f4f0e8]/28'}`}
                     aria-label="Upload app bundle"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => file ? handleRunAudit() : fileInputRef.current?.click()}
-                    disabled={isUploading || (!!file && !isReady)}
-                    className="absolute left-[4.6%] bottom-[7%] hidden h-[7.2%] w-[15.5%] rounded-lg outline-none transition-colors hover:bg-[#9be15d]/10 focus-visible:ring-2 focus-visible:ring-[#9be15d] md:block disabled:cursor-not-allowed"
-                    aria-label={file ? 'Run audit' : 'Select app bundle'}
-                  />
-                  <Link
-                    href="https://github.com/atharvnaik1/ipaship-app-reviewer"
-                    target="_blank"
-                    className="absolute left-[22.6%] bottom-[8.2%] hidden h-[5.8%] w-[7.8%] rounded-md outline-none transition-colors hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-[#9be15d] md:block"
-                    aria-label="Open ipaShip source on GitHub"
-                  />
+                  >
+                    <span className="grid h-20 w-20 shrink-0 place-items-center rounded-lg border border-dashed border-[#f4f0e8]/26">
+                      <Upload className="h-8 w-8 text-[#9be15d]" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-xl font-normal text-[#f4f0e8]">{file ? file.name : 'Upload app bundle'}</span>
+                      <span className="mt-1 block text-sm text-[#c9d0cb]/68">{file ? formatFileSize(file.size) : '.ipa, .aab, or .zip'}</span>
+                      <span className="mt-2 block text-sm text-[#8b9691]">
+                        {file ? (uploadedFileId ? 'Upload complete. Ready to audit.' : 'Preparing upload...') : <>Drag &amp; drop or click to <span className="text-[#9be15d]">browse</span></>}
+                      </span>
+                    </span>
+                    <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-[#f4f0e8]/35 text-2xl text-[#c9d0cb]">→</span>
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#9be15d] px-4 py-3 text-sm font-black text-[#050606] transition-colors hover:bg-[#b7f278] md:hidden"
-                >
-                  <Upload className="h-4 w-4" />
-                  Upload app bundle
-                </button>
               </section>
 
               {(file || uploadError || errorMessage || isUploading) && (
@@ -853,45 +965,145 @@ export default function AuditPage() {
                 </motion.section>
               )}
 
-              <section id="about" className="mt-8 md:mt-12">
-                <img
-                  src="/images/ipaship-readiness-section.png"
-                  alt="ipaShip review readiness report section"
-                  className="block w-full border border-[#f4f0e8]/10 bg-[#050606] shadow-[0_34px_110px_rgba(0,0,0,0.42)]"
-                  draggable={false}
-                />
+              <section id="about" className="relative mt-8 min-h-[620px] overflow-hidden border border-[#f4f0e8]/10 bg-[#050606] shadow-[0_34px_110px_rgba(0,0,0,0.42)] md:mt-12 md:min-h-[720px]">
+                <img src="/images/ipaship-bg-readiness.png" alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover opacity-64" draggable={false} />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_46%_42%,rgba(155,225,93,0.12),transparent_28%),linear-gradient(90deg,rgba(5,6,6,0.86)_0%,rgba(5,6,6,0.58)_48%,rgba(5,6,6,0.9)_100%)]" />
+                <div className="relative z-10 flex min-h-[620px] flex-col gap-10 px-6 py-10 md:min-h-[720px] md:px-10 md:py-14">
+                  <div className="grid gap-8 lg:grid-cols-[0.78fr_1fr] lg:items-end">
+                    <div>
+                      <p className="mb-5 w-fit border-b border-[#a99673]/55 pb-3 text-base font-medium text-[#9be15d] md:text-xl">{readinessSection.eyebrow}</p>
+                      <h2 className="max-w-[760px] text-[clamp(3.4rem,7vw,6.2rem)] font-normal leading-[0.94] tracking-[-0.055em] text-[#f4f0e8]">
+                        {readinessSection.title} <span className="text-[#9be15d]">{readinessSection.accent}</span> {readinessSection.titleSuffix}
+                      </h2>
+                    </div>
+                    <p className="max-w-[520px] text-lg leading-relaxed text-[#c9d0cb]/76 md:justify-self-end md:text-2xl">
+                      {readinessSection.description}
+                    </p>
+                  </div>
+
+                  <div className="grid flex-1 gap-6 lg:grid-cols-[1fr_0.82fr] lg:items-end">
+                    <div className="relative overflow-hidden rounded-xl border border-[#f4f0e8]/16 bg-[#0a0d0c]/76 p-4 backdrop-blur-md md:p-6">
+                      <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <p className="text-sm font-black text-[#f4f0e8]">ipaShip</p>
+                          <h3 className="mt-6 max-w-[430px] text-3xl font-normal tracking-[-0.035em] text-[#f4f0e8] md:text-5xl">{readinessSection.panelTitle}</h3>
+                        </div>
+                        <div className="grid h-40 w-40 shrink-0 place-items-center rounded-full bg-[conic-gradient(#9be15d_0_82%,rgba(244,240,232,0.11)_82%_100%)]">
+                          <div className="grid h-32 w-32 place-items-center rounded-full bg-[#090c0b]">
+                            <span className="text-center">
+                              <span className="block text-5xl font-black text-[#f4f0e8]">{readinessSection.score}</span>
+                              <span className="text-sm text-[#c9d0cb]/72">readiness</span>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-8 grid gap-3 md:grid-cols-3">
+                        {readinessSection.metrics.map((metric) => (
+                          <div key={metric.label} className="border border-[#f4f0e8]/12 bg-[#f4f0e8]/[0.035] p-4">
+                            <p className="text-4xl font-black text-[#f4f0e8]">{metric.value}</p>
+                            <p className="mt-2 text-sm text-[#9be15d]">{metric.label}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="mt-6 space-y-3">
+                        {readinessSection.issues.map((issue) => (
+                          <div key={issue.title} className="flex items-center justify-between border-b border-[#f4f0e8]/10 pb-3 text-sm last:border-b-0 last:pb-0">
+                            <span className="text-[#c9d0cb]/78">{issue.title}</span>
+                            <span className={issue.severity === 'Critical' ? 'text-red-400' : issue.severity === 'Major' ? 'text-yellow-300' : 'text-blue-300'}>{issue.severity}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
+                      {readinessSection.summary.map((item) => (
+                        <div key={item.label} className="border-l border-[#a99673]/50 bg-[#050606]/42 px-5 py-4 backdrop-blur-sm">
+                          <p className="text-xs uppercase tracking-[0.22em] text-[#8b9691]">{item.label}</p>
+                          <p className="mt-2 text-2xl font-medium text-[#f4f0e8]">{item.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </section>
 
-              <section id="security" className="mt-8 md:mt-12">
-                <img
-                  src="/images/ipaship-workflow-section.png"
-                  alt="ipaShip workflow and security section"
-                  className="block w-full border border-[#f4f0e8]/10 bg-[#050606] shadow-[0_34px_110px_rgba(0,0,0,0.42)]"
-                  draggable={false}
-                />
+              <section id="security" className="relative mt-8 min-h-[700px] overflow-hidden border border-[#f4f0e8]/10 bg-[#050606] shadow-[0_34px_110px_rgba(0,0,0,0.42)] md:mt-12">
+                <img src="/images/ipaship-bg-workflow.png" alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover opacity-72" draggable={false} />
+                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,6,0.72),rgba(5,6,6,0.18)_42%,rgba(5,6,6,0.86))]" />
+                <div className="relative z-10 flex min-h-[700px] flex-col px-6 py-10 md:px-10 md:py-14">
+                  <p className="text-sm font-medium uppercase tracking-[0.34em] text-[#9be15d]">{workflowSection.eyebrow} <span className="ml-4 text-[#c9d0cb]/70">{workflowSection.label}</span></p>
+                  <h2 className="mt-10 max-w-[760px] text-[clamp(3.4rem,6vw,6rem)] font-normal leading-[0.95] tracking-[-0.045em] text-[#f4f0e8]">
+                    {workflowSection.title}
+                  </h2>
+                  <p className="mt-6 max-w-[540px] text-xl leading-relaxed text-[#c9d0cb]/70">
+                    {workflowSection.description}
+                  </p>
+
+                  <div className="mt-auto grid gap-5 md:grid-cols-4">
+                    {workflowSection.steps.map((item) => (
+                      <div key={item.step} className="rounded-xl border border-[#f4f0e8]/14 bg-[#050606]/68 p-5 backdrop-blur-md">
+                        <p className="text-sm font-medium text-[#9be15d]">{item.step}</p>
+                        <h3 className="mt-2 text-2xl font-normal text-[#f4f0e8]">{item.title}</h3>
+                        <pre className="mt-5 min-h-[92px] whitespace-pre-wrap rounded-lg border border-[#f4f0e8]/12 bg-[#f4f0e8]/[0.035] p-4 font-mono text-xs leading-relaxed text-[#c9d0cb]/76">{item.body}</pre>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-10 grid gap-5 border-t border-[#f4f0e8]/12 pt-8 md:grid-cols-3">
+                    {workflowSection.security.map(({ title, description, icon: Icon }) => (
+                      <div key={title} className="flex gap-5">
+                        <Icon className="h-9 w-9 shrink-0 text-[#9be15d]" />
+                        <div>
+                          <h3 className="text-xl font-medium text-[#f4f0e8]">{title}</h3>
+                          <p className="mt-2 max-w-[290px] text-sm leading-relaxed text-[#c9d0cb]/72">{description}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </section>
 
-              <section id="open-source" className="my-8 md:my-12">
-                <div className="relative">
-                  <img
-                    src="/images/ipaship-cta-section.png"
-                    alt="ipaShip know before you submit call to action"
-                    className="block w-full border border-[#f4f0e8]/10 bg-[#050606] shadow-[0_34px_110px_rgba(0,0,0,0.42)]"
-                    draggable={false}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => file ? handleRunAudit() : fileInputRef.current?.click()}
-                    disabled={isUploading || (!!file && !isReady)}
-                    className="absolute left-[5.2%] top-[59.5%] hidden h-[9%] w-[19.2%] rounded-lg outline-none transition-colors hover:bg-[#9be15d]/10 focus-visible:ring-2 focus-visible:ring-[#9be15d] md:block disabled:cursor-not-allowed"
-                    aria-label={file ? 'Run audit' : 'Start audit'}
-                  />
-                  <Link
-                    href="https://github.com/atharvnaik1/ipaship-app-reviewer"
-                    target="_blank"
-                    className="absolute left-[28%] top-[61%] hidden h-[6.5%] w-[8.5%] rounded-md outline-none transition-colors hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-[#9be15d] md:block"
-                    aria-label="Open ipaShip source on GitHub"
-                  />
+              <section id="open-source" className="relative my-8 min-h-[620px] overflow-hidden border border-[#f4f0e8]/10 bg-[#050606] shadow-[0_34px_110px_rgba(0,0,0,0.42)] md:my-12">
+                <img src="/images/ipaship-bg-cta.png" alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover opacity-82" draggable={false} />
+                <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,6,6,0.9),rgba(5,6,6,0.62)_42%,rgba(5,6,6,0.18)_100%)]" />
+                <div className="relative z-10 flex min-h-[620px] flex-col justify-between px-6 py-10 md:px-10 md:py-12">
+                  <div />
+                  <div>
+                    <h2 className="max-w-[860px] text-[clamp(3.7rem,7vw,6.6rem)] font-normal leading-[0.95] tracking-[-0.055em] text-[#f4f0e8]">
+                      {ctaSection.title}
+                    </h2>
+                    <p className="mt-6 max-w-[520px] text-xl leading-relaxed text-[#c9d0cb]/78">
+                      {ctaSection.description}
+                    </p>
+                    <div className="mt-9 flex flex-wrap items-center gap-8">
+                      <button
+                        type="button"
+                        onClick={() => file ? handleRunAudit() : fileInputRef.current?.click()}
+                        disabled={isUploading || (!!file && !isReady)}
+                        className="inline-flex min-w-[230px] items-center justify-center gap-5 rounded-md bg-[#9be15d] px-7 py-4 text-lg font-medium text-[#050606] transition-colors hover:bg-[#b7f278] disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {ctaSection.primary}
+                        <span className="text-3xl leading-none">→</span>
+                      </button>
+                      <Link
+                        href="https://github.com/atharvnaik1/ipaship-app-reviewer"
+                        target="_blank"
+                        className="text-lg font-medium text-[#f4f0e8] underline decoration-[#f4f0e8]/70 underline-offset-8 transition-colors hover:text-[#9be15d]"
+                      >
+                        {ctaSection.secondary}
+                      </Link>
+                    </div>
+                  </div>
+                  <footer className="flex flex-col gap-4 border-t border-[#f4f0e8]/18 pt-7 md:flex-row md:items-center md:justify-between">
+                    <Link href="https://ipaship.com" target="_blank" className="text-2xl font-black tracking-[-0.04em] text-[#f4f0e8] transition-colors hover:text-[#9be15d]">ipaShip</Link>
+                    <div className="flex flex-wrap gap-8 text-sm text-[#f4f0e8]">
+                      <a href="https://ipaship.com/privacy" className="transition-colors hover:text-[#9be15d]">Security</a>
+                      <a href="https://ipaship.com/about" className="transition-colors hover:text-[#9be15d]">Docs</a>
+                      <a href="https://github.com/atharvnaik1/ipaship-app-reviewer" className="transition-colors hover:text-[#9be15d]">Source</a>
+                    </div>
+                  </footer>
                 </div>
               </section>
             </motion.div>
