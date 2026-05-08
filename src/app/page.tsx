@@ -972,63 +972,45 @@ export default function AuditPage() {
                 </motion.section>
               )}
 
-              <section id="about" className="relative mt-8 min-h-[620px] overflow-hidden border border-[#f4f0e8]/10 bg-[#050606] shadow-[0_34px_110px_rgba(0,0,0,0.42)] md:mt-12 md:min-h-[720px]">
-                <img src="/images/ipaship-bg-readiness.png" alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover opacity-64" draggable={false} />
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_46%_42%,rgba(155,225,93,0.12),transparent_28%),linear-gradient(90deg,rgba(5,6,6,0.86)_0%,rgba(5,6,6,0.58)_48%,rgba(5,6,6,0.9)_100%)]" />
-                <div className="relative z-10 flex min-h-[620px] flex-col gap-10 px-6 py-10 md:min-h-[720px] md:px-10 md:py-14">
-                  <div className="grid gap-8 lg:grid-cols-[0.78fr_1fr] lg:items-end">
-                    <div>
-                      <p className="mb-5 w-fit border-b border-[#a99673]/55 pb-3 text-base font-medium text-[#9be15d] md:text-xl">{readinessSection.eyebrow}</p>
-                      <h2 className="max-w-[760px] text-[clamp(3.4rem,7vw,6.2rem)] font-normal leading-[0.94] tracking-[-0.055em] text-[#f4f0e8]">
-                        {readinessSection.title} <span className="text-[#9be15d]">{readinessSection.accent}</span> {readinessSection.titleSuffix}
-                      </h2>
-                    </div>
-                    <p className="max-w-[520px] text-lg leading-relaxed text-[#c9d0cb]/76 md:justify-self-end md:text-2xl">
+              <section id="about" className="mt-8 overflow-hidden border border-[#f4f0e8]/10 bg-[#080a09] shadow-[0_28px_90px_rgba(0,0,0,0.36)] md:mt-12">
+                <div className="grid gap-8 px-6 py-10 md:px-10 md:py-14 lg:grid-cols-[0.9fr_1.05fr] lg:items-center">
+                  <div>
+                    <p className="mb-5 w-fit border-b border-[#9be15d]/50 pb-3 text-base font-medium text-[#9be15d] md:text-lg">{readinessSection.eyebrow}</p>
+                    <h2 className="max-w-[620px] text-[clamp(3rem,6vw,5.5rem)] font-normal leading-[0.96] tracking-[-0.055em] text-[#f4f0e8]">
+                      {readinessSection.title} <span className="text-[#9be15d]">{readinessSection.accent}</span> {readinessSection.titleSuffix}
+                    </h2>
+                    <p className="mt-6 max-w-[500px] text-base leading-relaxed text-[#c9d0cb]/72 md:text-xl">
                       {readinessSection.description}
                     </p>
+                    <div className="mt-8 grid max-w-[520px] grid-cols-3 border-y border-[#f4f0e8]/10">
+                      {readinessSection.summary.map((item) => (
+                        <div key={item.label} className="border-r border-[#f4f0e8]/10 py-5 pr-4 last:border-r-0 last:pl-4 sm:px-5 first:pl-0">
+                          <p className="text-[10px] uppercase tracking-[0.2em] text-[#8b9691]">{item.label}</p>
+                          <p className="mt-2 text-xl font-medium text-[#f4f0e8] md:text-2xl">{item.value}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
-                  <div className="grid flex-1 gap-6 lg:grid-cols-[1fr_0.82fr] lg:items-end">
-                    <div className="relative overflow-hidden rounded-xl border border-[#f4f0e8]/16 bg-[#0a0d0c]/76 p-4 backdrop-blur-md md:p-6">
-                      <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-                        <div>
-                          <p className="text-sm font-black text-[#f4f0e8]">ipaShip</p>
-                          <h3 className="mt-6 max-w-[430px] text-3xl font-normal tracking-[-0.035em] text-[#f4f0e8] md:text-5xl">{readinessSection.panelTitle}</h3>
-                        </div>
-                        <div className="grid h-40 w-40 shrink-0 place-items-center rounded-full bg-[conic-gradient(#9be15d_0_82%,rgba(244,240,232,0.11)_82%_100%)]">
-                          <div className="grid h-32 w-32 place-items-center rounded-full bg-[#090c0b]">
-                            <span className="text-center">
-                              <span className="block text-5xl font-black text-[#f4f0e8]">{readinessSection.score}</span>
-                              <span className="text-sm text-[#c9d0cb]/72">readiness</span>
-                            </span>
-                          </div>
-                        </div>
+                  <div className="rounded-xl border border-[#f4f0e8]/12 bg-[#0c0f0e] p-5 md:p-6">
+                    <div className="flex items-start justify-between gap-5">
+                      <div>
+                        <p className="text-sm font-black text-[#f4f0e8]">ipaShip</p>
+                        <h3 className="mt-4 text-2xl font-normal tracking-[-0.03em] text-[#f4f0e8] md:text-4xl">{readinessSection.panelTitle}</h3>
                       </div>
-
-                      <div className="mt-8 grid gap-3 md:grid-cols-3">
-                        {readinessSection.metrics.map((metric) => (
-                          <div key={metric.label} className="border border-[#f4f0e8]/12 bg-[#f4f0e8]/[0.035] p-4">
-                            <p className="text-4xl font-black text-[#f4f0e8]">{metric.value}</p>
-                            <p className="mt-2 text-sm text-[#9be15d]">{metric.label}</p>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="mt-6 space-y-3">
-                        {readinessSection.issues.map((issue) => (
-                          <div key={issue.title} className="flex items-center justify-between border-b border-[#f4f0e8]/10 pb-3 text-sm last:border-b-0 last:pb-0">
-                            <span className="text-[#c9d0cb]/78">{issue.title}</span>
-                            <span className={issue.severity === 'Critical' ? 'text-red-400' : issue.severity === 'Major' ? 'text-yellow-300' : 'text-blue-300'}>{issue.severity}</span>
-                          </div>
-                        ))}
+                      <div className="grid h-24 w-24 shrink-0 place-items-center rounded-full border-[10px] border-[#9be15d] bg-[#080a09] md:h-32 md:w-32">
+                        <span className="text-center">
+                          <span className="block text-3xl font-black text-[#f4f0e8] md:text-5xl">{readinessSection.score}</span>
+                          <span className="text-[10px] text-[#8b9691] md:text-xs">score</span>
+                        </span>
                       </div>
                     </div>
 
-                    <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
-                      {readinessSection.summary.map((item) => (
-                        <div key={item.label} className="border-l border-[#a99673]/50 bg-[#050606]/42 px-5 py-4 backdrop-blur-sm">
-                          <p className="text-xs uppercase tracking-[0.22em] text-[#8b9691]">{item.label}</p>
-                          <p className="mt-2 text-2xl font-medium text-[#f4f0e8]">{item.value}</p>
+                    <div className="mt-7 grid gap-3 sm:grid-cols-3">
+                      {readinessSection.metrics.map((metric) => (
+                        <div key={metric.label} className="border border-[#f4f0e8]/10 bg-[#f4f0e8]/[0.025] p-4">
+                          <p className="text-3xl font-black text-[#f4f0e8]">{metric.value}</p>
+                          <p className="mt-2 text-sm text-[#9be15d]">{metric.label}</p>
                         </div>
                       ))}
                     </div>
