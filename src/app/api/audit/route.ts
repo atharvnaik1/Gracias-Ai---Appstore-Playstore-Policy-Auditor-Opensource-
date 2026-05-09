@@ -50,6 +50,12 @@ const SKIP_DIRS = new Set([
 const MAX_FILE_SIZE = 50_000; // 50KB per individual source file
 const MAX_TOTAL_CONTENT = 350_000; // 350KB total context (roughly ~90k tokens max)
 
+function safePathSegment(value: string, fallback: string): string {
+  const basename = path.basename(value.replace(/\\/g, '/')).trim();
+  if (!basename || basename === '.' || basename === '..') return fallback;
+  return basename;
+}
+
 function getClientKey(req: NextRequest): string {
   const forwarded = req.headers.get('x-forwarded-for');
   if (forwarded) {
@@ -128,7 +134,7 @@ function parseMultipartStream(
         return;
       }
 
-      fileName = info.filename || 'upload.ipa';
+      fileName = safePathSegment(info.filename || '', 'upload.ipa');
       filePath = path.join(tempDir, fileName);
       fileReceived = true;
 
@@ -169,8 +175,8 @@ function parseMultipartStream(
       if (fieldname === 'provider') provider = val;
       if (fieldname === 'model') model = val;
       if (fieldname === 'context') context = val;
-      if (fieldname === 'fileId') fileId = val;
-      if (fieldname === 'fileName') fileName = val;
+      if (fieldname === 'fileId') fileId = safePathSegment(val, '');
+      if (fieldname === 'fileName' && !fileReceived) fileName = safePathSegment(val, 'upload.ipa');
     });
 
     busboy.on('finish', () => {
@@ -179,6 +185,7 @@ function parseMultipartStream(
         return;
       }
       if (!fileReceived && fileId) {
+        fileName = safePathSegment(fileName, 'upload.ipa');
         filePath = path.join(os.tmpdir(), fileId, fileName);
         fileReceived = true;
         writeFinished = true;
