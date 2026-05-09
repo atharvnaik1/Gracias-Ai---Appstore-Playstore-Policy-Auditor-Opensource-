@@ -1,0 +1,28 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Gracias AI logomark</title>
+  <desc id="desc">A rounded app tile containing a compliance shield, neural nodes, and an approval check.</desc>
+  <defs>
+    <linearGradient id="tile" x1="48" y1="32" x2="208" y2="224" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#a855f7"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="shield" x1="88" y1="64" x2="168" y2="188" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e0f2fe"/>
+    </linearGradient>
+    <filter id="softShadow" x="24" y="24" width="208" height="216" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#1e1b4b" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+  <rect x="36" y="28" width="184" height="184" rx="44" fill="url(#tile)" filter="url(#softShadow)"/>
+  <path d="M128 58L174 76V116C174 150 154.8 178.5 128 190C101.2 178.5 82 150 82 116V76L128 58Z" fill="url(#shield)"/>
+  <path d="M128 58L174 76V116C174 150 154.8 178.5 128 190C101.2 178.5 82 150 82 116V76L128 58Z" stroke="#ffffff" stroke-opacity="0.8" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M101 124L121 144L158 103" stroke="#2563eb" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M98 91H158M98 91L120 112M158 91L136 112M120 112H136M120 112L104 143M136 112L152 143" stroke="#7c3aed" stroke-width="5" stroke-linecap="round" opacity="0.7"/>
+  <circle cx="98" cy="91" r="8" fill="#a855f7"/>
+  <circle cx="158" cy="91" r="8" fill="#3b82f6"/>
+  <circle cx="120" cy="112" r="7" fill="#8b5cf6"/>
+  <circle cx="136" cy="112" r="7" fill="#60a5fa"/>
+  <circle cx="104" cy="143" r="6" fill="#a855f7"/>
+  <circle cx="152" cy="143" r="6" fill="#3b82f6"/>
+</svg>
