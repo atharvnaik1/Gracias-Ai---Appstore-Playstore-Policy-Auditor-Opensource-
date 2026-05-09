@@ -11,6 +11,12 @@ export const maxDuration = 300;
 const MAX_UPLOAD_SIZE = 150 * 1024 * 1024;
 const UPLOAD_TEMP_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
+function safePathSegment(value: string, fallback: string): string {
+  const basename = path.basename(value.replace(/\\/g, '/')).trim();
+  if (!basename || basename === '.' || basename === '..') return fallback;
+  return basename;
+}
+
 export async function POST(req: NextRequest) {
   let tempDir: string | null = null;
   
@@ -68,7 +74,7 @@ export async function POST(req: NextRequest) {
           return;
         }
 
-        fileName = info.filename || 'upload.ipa';
+        fileName = safePathSegment(info.filename || '', 'upload.ipa');
         filePath = path.join(tempDir!, fileName);
         fileReceived = true;
 
