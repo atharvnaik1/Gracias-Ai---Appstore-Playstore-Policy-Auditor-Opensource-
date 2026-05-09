@@ -8,7 +8,8 @@ const starsCache = new LRUCache<string, number>({
   ttl: 1000 * 60 * 5, // 5 minutes
 });
 
-const REPO = 'https://github.com/atharvnaik1/GraciasAi-Appstore-Policy-Auditor-Opensource';
+const REPO_OWNER = 'atharvnaik1';
+const REPO_NAME = 'ipaship-app-reviewer';
 const CACHE_KEY = 'stars';
 
 export async function GET() {
@@ -18,7 +19,7 @@ export async function GET() {
       return NextResponse.json({ stars: cached });
     }
 
-    const res = await fetch(`https://api.github.com/repos/${REPO}`, {
+    const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`, {
       headers: { Accept: 'application/vnd.github.v3+json' },
       next: { revalidate: 0 },
     });

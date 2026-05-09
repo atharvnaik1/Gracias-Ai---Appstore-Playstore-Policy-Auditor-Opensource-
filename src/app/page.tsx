@@ -623,7 +623,7 @@ export default function AuditPage() {
 
           <div className="flex items-center gap-2 md:gap-3">
             <Link
-              href="https://github.com/atharvnaik1/GraciasAi-Appstore-Policy-Auditor-Opensource"
+              href="https://github.com/atharvnaik1/ipaship-app-reviewer"
               target="_blank"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 text-xs font-bold text-green-400 transition-all shadow-[0_0_15px_rgba(34,197,94,0.15)]"
             >
@@ -1092,7 +1092,7 @@ export default function AuditPage() {
                     <a href="https://gracias.sh/privacy" className="hover:text-white transition-colors">Privacy</a>
                     <a href="https://gracias.sh/about" className="hover:text-white transition-colors">About</a>
                     <a href="mailto:business@gracias.sh" className="hover:text-white transition-colors">Contact</a>
-                    <a href="https://github.com/atharvnaik1/GraciasAi-Appstore-Policy-Auditor-Opensource" className="flex items-center gap-1 hover:text-white transition-colors">
+                    <a href="https://github.com/atharvnaik1/ipaship-app-reviewer" className="flex items-center gap-1 hover:text-white transition-colors">
                       Source <ExternalLink className="w-3 h-3" />
                     </a>
                   </div>
@@ -1287,7 +1287,7 @@ export default function AuditPage() {
                     <a href="mailto:business@gracias.sh" className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-white font-medium transition-colors">
                       <Mail className="w-3 h-3" /> business@gracias.sh
                     </a>
-                    <a href="https://github.com/atharvnaik1/GraciasAi-Appstore-Policy-Auditor-Opensource" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-white font-medium transition-colors">
+                    <a href="https://github.com/atharvnaik1/ipaship-app-reviewer" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-white font-medium transition-colors">
                       <Github className="w-3 h-3" /> Source
                     </a>
                   </div>
