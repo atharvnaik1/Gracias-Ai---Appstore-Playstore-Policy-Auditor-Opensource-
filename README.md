@@ -67,6 +67,11 @@ def get_vercel_authorization_instructions() -> str:
     ]
     return "\n".join(steps)
 
+def display_vercel_authorization_steps() -> None:
+    """Print Vercel deployment authorization steps to the console."""
+    LOGGER.info("Vercel Deployment Authorization Steps:")
+    print(get_vercel_authorization_instructions())
+
 # --------------------------------------------------------------------------- #
 # Logging configuration
 # --------------------------------------------------------------------------- #
@@ -199,6 +204,9 @@ def main(repo_url: str, base_dir: Path) -> None:
         repo_url: HTTPS URL of the Git repository.
         base_dir: Directory where the repository will be cloned.
     """
+    # Display Vercel deployment authorization steps before proceeding
+    display_vercel_authorization_steps()
+
     repo_dir = base_dir / "llm-microservice"
     venv_dir = repo_dir / ".venv"
     requirements_path = repo_dir / "requirements.txt"
@@ -208,22 +216,18 @@ def main(repo_url: str, base_dir: Path) -> None:
         create_virtual_environment(venv_dir)
         install_dependencies(venv_dir, requirements_path)
         LOGGER.info("Setup completed successfully.")
-        LOGGER.info("\nVercel Deployment Authorization Instructions:\n%s", get_vercel_authorization_instructions())
-    except SetupError as err:
-        LOGGER.error("Setup failed: %s", err)
+    except SetupError as e:
+        LOGGER.error("Setup failed: %s", e)
         sys.exit(1)
 
 
-# --------------------------------------------------------------------------- #
-# Entry point
-# --------------------------------------------------------------------------- #
 if __name__ == "__main__":
     # Example usage:
-    #   python setup.py https://github.com/your-org/llm-microservice.git /tmp
+    # python setup.py https://github.com/atharvnaik1/ipaship-app-reviewer.git /path/to/base/dir
     if len(sys.argv) != 3:
-        LOGGER.error("Usage: %s <repo_url> <target_base_dir>", sys.argv[0])
+        LOGGER.error("Usage: %s <repo_url> <base_dir>", sys.argv[0])
         sys.exit(2)
 
-    repository_url = sys.argv[1]
-    base_directory = Path(sys.argv[2]).expanduser().resolve()
-    main(repository_url, base_directory)
+    repo_url_arg = sys.argv[1]
+    base_dir_arg = Path(sys.argv[2]).expanduser().resolve()
+    main(repo_url_arg, base_dir_arg)

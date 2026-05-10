@@ -1,0 +1,20 @@
+{
+  "teamId": "team_c0hqDrZckNBm5AkYTYHVKoE8",
+  "projectId": "atharvnaik1s-projects",
+  "build": {
+    "src": "src/index.js",
+    "use": "@vercel/node"
+  },
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/src/index.js"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "git": {
+    "deploymentBranch": "main"
+  }
+}
