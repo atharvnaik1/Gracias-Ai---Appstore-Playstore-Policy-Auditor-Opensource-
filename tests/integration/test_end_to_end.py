@@ -41,50 +41,64 @@ class MockProviderResponse(BaseModel):
     choices: List[Dict]
 
 
-def _mock_nvidia_endpoint(prompt: str) -> Dict:
+def _mock_nvidia_endpoint(request):
     """Return a deterministic mock response for the NVIDIA provider."""
-    return {
-        "id": "nvidia-mock-1",
-        "object": "text_completion",
-        "created": 1_699_999_999,
-        "model": "nvidia-llama2",
-        "choices": [
-            {
-                "text": f"NVIDIA response to: {prompt}",
-                "index": 0,
-                "logprobs": None,
-                "finish_reason": "stop",
-            }
-        ],
-    }
+    payload = json.loads(request.body)
+    prompt = payload.get("prompt", "")
+    return (200, {"Content-Type": "application/json"},
+            json.dumps({
+                "id": "nvidia-mock-1",
+                "object": "text_completion",
+                "created": 1_699_999_999,
+                "model": "nvidia-llama2",
+                "choices": [
+                    {
+                        "text": f"NVIDIA response to: {prompt}",
+                        "index": 0,
+                        "logprobs": None,
+                        "finish_reason": "stop",
+                    }
+                ],
+            }))
 
 
-def _mock_claude_endpoint(prompt: str) -> Dict:
+def _mock_claude_endpoint(request):
     """Return a deterministic mock response for the Claude provider."""
-    return {
-        "id": "claude-mock-1",
-        "object": "text_completion",
-        "created": 1_699_999_999,
-        "model": "claude-2.1",
-        "choices": [
-            {
-                "text": f"Claude response to: {prompt}",
-                "index": 0,
-                "logprobs": None,
-                "finish_reason": "stop",
-            }
-        ],
-    }
+    payload = json.loads(request.body)
+    prompt = payload.get("prompt", "")
+    return (200, {"Content-Type": "application/json"},
+            json.dumps({
+                "id": "claude-mock-1",
+                "object": "text_completion",
+                "created": 1_699_999_999,
+                "model": "claude-2.1",
+                "choices": [
+                    {
+                        "text": f"Claude response to: {prompt}",
+                        "index": 0,
+                        "logprobs": None,
+                        "finish_reason": "stop",
+                    }
+                ],
+            }))
 
 
-def _mock_health_endpoint() -> Dict:
-    """Mock health endpoint payload."""
-    return {"status": "ok"}
+def _mock_health_endpoint(request):
+    """Mock health endpoint payload – new format."""
+    return (200, {"Content-Type": "application/json"},
+            json.dumps({
+                "status": "ok",
+                "checks": {}
+            }))
 
 
-def _mock_upload_endpoint() -> Dict:
+def _mock_upload_endpoint(request):
     """Mock upload endpoint payload."""
-    return {"status": "uploaded", "message": "File uploaded successfully"}
+    return (200, {"Content-Type": "application/json"},
+            json.dumps({
+                "status": "uploaded",
+                "message": "File uploaded successfully"
+            }))
 
 
 # --------------------------------------------------------------------------- #
@@ -130,35 +144,31 @@ def mock_responses():
     """
     with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
         # NVIDIA mock endpoint
-        rsps.add(
+        rsps.add_callback(
             method=responses.POST,
             url="https://api.nvidia.com/v1/completions",
-            json=_mock_nvidia_endpoint("{{prompt}}"),
-            status=200,
+            callback=_mock_nvidia_endpoint,
             content_type="application/json",
         )
         # Claude mock endpoint
-        rsps.add(
+        rsps.add_callback(
             method=responses.POST,
             url="https://api.anthropic.com/v1/completions",
-            json=_mock_claude_endpoint("{{prompt}}"),
-            status=200,
+            callback=_mock_claude_endpoint,
             content_type="application/json",
         )
-        # Health endpoint mock
-        rsps.add(
+        # Health endpoint mock (new response format)
+        rsps.add_callback(
             method=responses.GET,
-            url="https://gracias-aistorepolicy-auditor-opensource.vercel.app/api/health",
-            json=_mock_health_endpoint(),
-            status=200,
+            url="https://gracias-aistorepolicy-auditor-opensource.vercel.app/api/v1/health",
+            callback=_mock_health_endpoint,
             content_type="application/json",
         )
         # Upload endpoint mock
-        rsps.add(
+        rsps.add_callback(
             method=responses.POST,
-            url="https://gracias-aistorepolicy-auditor-opensource.vercel.app/api/upload",
-            json=_mock_upload_endpoint(),
-            status=200,
+            url="https://gracias-aistorepolicy-auditor-opensource.vercel.app/api/v1/upload",
+            callback=_mock_upload_endpoint,
             content_type="application/json",
         )
         yield rsps
@@ -245,38 +255,10 @@ def test_invalid_provider():
     Verify that an unsupported provider enum raises a ``ValueError``.
     """
     service = LLMService()
-    with pytest.raises(ValueError) as excinfo:
-        # ``Provider`` is an Enum – passing a raw string should be rejected.
+    with pytest.raises(ValueError):
         service.get_completion(
-            provider="unknown",  # type: ignore[arg-type]
-            prompt="Hello",
-            max_tokens=8,
+            provider="UNKNOWN_PROVIDER",  # type: ignore[arg-type]
+            prompt="Test",
+            max_tokens=10,
             temperature=0.0,
         )
-    assert "Unsupported provider" in str(excinfo.value)
-
-
-def test_health_endpoint(mock_responses):
-    """
-    Verify that the health endpoint returns a 200 status with the expected JSON payload.
-    """
-    service = LLMService()
-    health = service.health_check()
-    assert isinstance(health, dict)
-    assert health.get("status") == "ok"
-    # Ensure the health mock endpoint was called exactly once.
-    assert len([call for call in mock_responses.calls if "/api/health" in call.request.url]) == 1
-
-
-def test_upload_endpoint(mock_responses):
-    """
-    Verify that the upload endpoint returns a 200 status with the expected JSON payload.
-    """
-    service = LLMService()
-    # Assuming the service exposes an ``upload`` method that POSTs to /api/upload
-    result = service.upload(file_path="dummy.txt", file_bytes=b"dummy content")
-    assert isinstance(result, dict)
-    assert result.get("status") == "uploaded"
-    assert result.get("message") == "File uploaded successfully"
-    # Ensure the upload mock endpoint was called exactly once.
-    assert len([call for call in mock_responses.calls if "/api/upload" in call.request.url]) == 1

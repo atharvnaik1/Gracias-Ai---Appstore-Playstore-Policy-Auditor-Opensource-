@@ -1,3 +1,4 @@
+json
 {
   "name": "ipaship",
   "version": "1.0.0",
@@ -8,7 +9,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p $PORT",
     "vercel-build": "next build",
     "vercel-deploy": "vercel --prod --team \"atharvnaik1's projects\""
   },

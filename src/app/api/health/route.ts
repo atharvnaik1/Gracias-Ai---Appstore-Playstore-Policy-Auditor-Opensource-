@@ -4,6 +4,7 @@ import { MongoClient } from 'mongodb';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const APP_VERSION = process.env.APP_VERSION || '1.0.0';
+const START_TIME = Date.now();
 let client;
 
 export async function GET(request) {
@@ -23,14 +24,21 @@ export async function GET(request) {
       );
     }
 
+    // Calculate uptime in seconds
+    const uptimeSeconds = Math.floor((Date.now() - START_TIME) / 1000);
+
     // Set Cache-Control header
     const headers = new Headers({
       'Cache-Control': 'no-store, max-age=0',
     });
 
-    // Return health status with version
+    // Return health status with version and uptime
     return NextResponse.json(
-      { status: 'OK', version: APP_VERSION },
+      {
+        status: 'OK',
+        version: APP_VERSION,
+        uptime_seconds: uptimeSeconds,
+      },
       { status: 200, headers }
     );
   } catch (error) {

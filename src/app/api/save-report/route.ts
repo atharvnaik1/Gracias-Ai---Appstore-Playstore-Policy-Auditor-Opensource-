@@ -5,8 +5,13 @@ import { Report } from '../../../models/Report';
 
 const MAX_REPORT_SIZE = 500_000; // 500KB max report content
 
-/** Simple schema validation */
-function validatePayload(payload: any) {
+interface ReportPayload {
+  reportContent: string;
+  filesScanned: string[];
+}
+
+/** Validate request payload */
+function validatePayload(payload: any): string[] {
   const errors: string[] = [];
 
   if (!payload || typeof payload !== 'object') {
@@ -14,36 +19,36 @@ function validatePayload(payload: any) {
     return errors;
   }
 
-  const { reportContent, filesScanned } = payload;
+  const { reportContent, filesScanned } = payload as ReportPayload;
 
   if (typeof reportContent !== 'string') {
     errors.push('reportContent must be a string');
-  } else if (reportContent.length === 0) {
+  } else if (!reportContent.trim()) {
     errors.push('reportContent cannot be empty');
-  } else if (reportContent.length > MAX_REPORT_SIZE) {
-    errors.push(`reportContent exceeds maximum size of ${MAX_REPORT_SIZE} characters`);
+  } else if (Buffer.byteLength(reportContent, 'utf8') > MAX_REPORT_SIZE) {
+    errors.push(`reportContent exceeds maximum size of ${MAX_REPORT_SIZE} bytes`);
   }
 
   if (!Array.isArray(filesScanned)) {
     errors.push('filesScanned must be an array');
   } else {
-    const nonString = filesScanned.some((f) => typeof f !== 'string');
-    if (nonString) errors.push('All items in filesScanned must be strings');
+    const invalid = filesScanned.some((f) => typeof f !== 'string');
+    if (invalid) errors.push('All items in filesScanned must be strings');
   }
 
   return errors;
 }
 
 export async function POST(req: NextRequest) {
-  // 1️⃣ Parse and validate payload
+  // Parse JSON body
   let payload: any;
   try {
     payload = await req.json();
-  } catch (e) {
-    console.error('Invalid JSON:', e);
+  } catch {
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
+  // Validate payload
   const validationErrors = validatePayload(payload);
   if (validationErrors.length) {
     return NextResponse.json(
@@ -52,12 +57,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 2️⃣ Persist to MongoDB
+  // Persist to MongoDB
   try {
     await dbConnect();
 
-    const ReportModel = Report as any; // Mongoose model
-    const newReport = await ReportModel.create({
+    const newReport = await Report.create({
       reportContent: payload.reportContent,
       filesScanned: payload.filesScanned,
     });
@@ -66,13 +70,11 @@ export async function POST(req: NextRequest) {
       { success: true, reportId: newReport._id },
       { status: 201 }
     );
-  } catch (dbError) {
-    console.error('Database error while saving report:', dbError);
-    // Distinguish validation errors from DB errors if possible
-    const message =
-      dbError && (dbError as any).message
-        ? (dbError as any).message
-        : 'Failed to save report';
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch (err: any) {
+    console.error('Failed to save report:', err);
+    return NextResponse.json(
+      { error: err?.message ?? 'Failed to save report' },
+      { status: 500 }
+    );
   }
 }

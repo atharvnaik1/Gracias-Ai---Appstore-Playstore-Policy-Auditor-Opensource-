@@ -48,6 +48,29 @@ export async function dbConnect() {
 }
 
 /**
+ * Gracefully close the mongoose connection.
+ */
+export async function dbClose() {
+  if (cached.conn) {
+    await mongoose.disconnect();
+    cached.conn = null;
+    cached.promise = null;
+  }
+}
+
+/**
+ * Ensure the mongoose client is closed on process termination.
+ */
+process.on('SIGINT', async () => {
+  await dbClose();
+  process.exit(0);
+});
+process.on('SIGTERM', async () => {
+  await dbClose();
+  process.exit(0);
+});
+
+/**
  * Export the underlying mongoose instance for reusable client usage.
  */
 export const mongooseClient = mongoose;

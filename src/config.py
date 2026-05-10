@@ -3,12 +3,13 @@ python
 src/config.py
 ==============
 
-Utility module for loading, validating, and exposing API keys used by the
-application (NVIDIA and Anthropic Claude).  The implementation follows
+Utility module for loading, validating, and exposing configuration values used by the
+application (database URI, API keys, etc.).  The implementation follows
 production‑grade standards:
 
 *   Typed public interface.
-*   Simple environment‑variable loading (os.getenv) with sensible defaults.
+*   Simple environment‑variable loading (os.getenv) with sensible defaults for
+    local development.
 *   Thread‑safe caching via ``functools.lru_cache``.
 *   Structured logging (debug, info, warning, error) without leaking
     secrets.
@@ -73,10 +74,12 @@ def _mask_key(key: str) -> str:
 # --------------------------------------------------------------------------- #
 # Validation utilities
 # --------------------------------------------------------------------------- #
-def _validate_key(value: str | None, name: str) -> str:
+def _validate_key(value: str | None, name: str, default: str | None = None) -> str:
     """
     Validate that a key is a non‑empty string without whitespace and
-    matches the expected pattern (alphanumeric, hyphens, underscores).
+    matches the expected pattern (alphanumeric, hyphens, underscores).  If
+    ``value`` is ``None`` and a ``default`` is provided, the default is used
+    (useful for local development).
 
     Parameters
     ----------
@@ -84,6 +87,8 @@ def _validate_key(value: str | None, name: str) -> str:
         Raw value supplied from the environment.
     name: str
         Human‑readable name of the variable for error messages.
+    default: str | None
+        Default value to use when ``value`` is missing.
 
     Returns
     -------
@@ -95,6 +100,12 @@ def _validate_key(value: str | None, name: str) -> str:
     ConfigError
         If the key is missing, empty, contains whitespace, or fails the pattern.
     """
+    if value is None:
+        if default is not None:
+            value = default
+            LOGGER.info("%s not set – using development default.", name)
+        else:
+            raise ConfigError(f"{name} must be set in the environment")
     if not isinstance(value, str) or not value.strip():
         raise ConfigError(f"{name} must be a non‑empty string")
     stripped = value.strip()
@@ -108,6 +119,38 @@ def _validate_key(value: str | None, name: str) -> str:
     return stripped
 
 
+def _validate_uri(value: str | None, name: str, default: str) -> str:
+    """
+    Validate a URI string.  If missing, fall back to ``default`` (development
+    environment).
+
+    Parameters
+    ----------
+    value: str | None
+        Raw value from the environment.
+    name: str
+        Variable name for logging / error messages.
+    default: str
+        Development‑time default.
+
+    Returns
+    -------
+    str
+        Validated URI.
+
+    Raises
+    ------
+    ConfigError
+        If the supplied value is not a string.
+    """
+    if value is None:
+        LOGGER.info("%s not set – using development default.", name)
+        return default
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError(f"{name} must be a non‑empty string")
+    return value.strip()
+
+
 # --------------------------------------------------------------------------- #
 # Cached accessor for the configuration
 # --------------------------------------------------------------------------- #
@@ -119,7 +162,7 @@ def _load_config() -> dict[str, str]:
     Returns
     -------
     dict[str, str]
-        Mapping with keys ``nvidia_api_key`` and ``claude_api_key``.
+        Mapping with keys ``db_uri``, ``nvidia_api_key`` and ``claude_api_key``.
 
     Raises
     ------
@@ -127,18 +170,31 @@ def _load_config() -> dict[str, str]:
         If any required variable is missing or invalid.
     """
     try:
+        # Database URI – default to a local SQLite file for development
+        db_uri_raw = os.getenv("DB_URI")
+        db_uri = _validate_uri(db_uri_raw, "DB_URI", "sqlite:///local.db")
+
+        # API keys – provide dummy defaults for local development
         nvidia_raw = os.getenv("NVIDIA_API_KEY")
         claude_raw = os.getenv("CLAUDE_API_KEY")
-
-        nvidia_key = _validate_key(nvidia_raw, "NVIDIA_API_KEY")
-        claude_key = _validate_key(claude_raw, "CLAUDE_API_KEY")
+        nvidia_key = _validate_key(
+            nvidia_raw, "NVIDIA_API_KEY", default="dev-nvidia-key"
+        )
+        claude_key = _validate_key(
+            claude_raw, "CLAUDE_API_KEY", default="dev-claude-key"
+        )
 
         LOGGER.debug(
-            "Configuration loaded: NVIDIA=%s, Claude=%s",
+            "Configuration loaded: DB=%s, NVIDIA=%s, Claude=%s",
+            db_uri,
             _mask_key(nvidia_key),
             _mask_key(claude_key),
         )
-        return {"nvidia_api_key": nvidia_key, "claude_api_key": claude_key}
+        return {
+            "db_uri": db_uri,
+            "nvidia_api_key": nvidia_key,
+            "claude_api_key": claude_key,
+        }
     except ConfigError as exc:
         LOGGER.error("Configuration validation failed: %s", exc)
         raise
@@ -150,6 +206,33 @@ def _load_config() -> dict[str, str]:
 # --------------------------------------------------------------------------- #
 # Public getters – cached for performance, never log the full key
 # --------------------------------------------------------------------------- #
+@lru_cache(maxsize=1)
+def get_db_uri() -> str:
+    """
+    Retrieve the validated database URI.
+
+    Returns
+    -------
+    str
+        Database connection string.
+
+    Raises
+    ------
+    ConfigError
+        If the URI cannot be obtained.
+    """
+    try:
+        uri = _load_config()["db_uri"]
+        LOGGER.debug("Database URI accessed: %s", uri)
+        return uri
+    except ConfigError:
+        LOGGER.exception("Failed to obtain DB_URI")
+        raise
+    except Exception as exc:  # pragma: no cover
+        LOGGER.exception("Unexpected error while obtaining DB_URI")
+        raise ConfigError("DB_URI is not configured") from exc
+
+
 @lru_cache(maxsize=1)
 def get_nvidia_key() -> str:
     """
@@ -209,6 +292,7 @@ def get_claude_key() -> str:
 # --------------------------------------------------------------------------- #
 __all__: list[str] = [
     "ConfigError",
+    "get_db_uri",
     "get_nvidia_key",
     "get_claude_key",
 ]

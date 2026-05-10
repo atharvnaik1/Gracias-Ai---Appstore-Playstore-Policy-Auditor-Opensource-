@@ -4,7 +4,7 @@ json
   "name": "atharvnaik1s-projects",
   "teamId": "team_c0hqDrZckNBm5AkYTYHVKoE8",
   "build": {
-    "src": "next.config.mjs",
+    "src": "next.config.js",
     "use": "@vercel/next"
   },
   "outputDirectory": "out",
@@ -19,6 +19,10 @@ json
   "cleanUrls": true,
   "trailingSlash": false,
   "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
     {
       "src": "/(.*)",
       "dest": "/$1"
