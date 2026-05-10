@@ -31,6 +31,14 @@ python
 # executing any deployment scripts.
 # ------------------------------------------------------------
 
+# ------------------------------------------------------------
+# Additional Deployment Authorization Note
+# ------------------------------------------------------------
+# The Vercel team (atharvnaik1's projects) must explicitly authorize
+# the deployment by visiting the link above. Without this
+# authorization, Vercel will reject any deployment attempts.
+# ------------------------------------------------------------
+
 import os
 import logging
 from typing import Literal, Optional

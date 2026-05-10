@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "name": "atharvnaik1s-projects",
+  "teamId": "team_c0hqDrZckNBm5AkYTYHVKoE8",
+  "builds": [
+    {
+      "src": "next.config.js",
+      "use": "@vercel/next"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
+  ]
+}
