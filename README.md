@@ -11,15 +11,8 @@ dependencies.
 ⚠️ Vercel Deployment Authorization
 ---------------------------------
 Before deploying this project to Vercel under the **atharvnaik1's projects** team,
-a team member must authorize the deployment. Use the following URL to grant
-access:
-
-https://vercel.com/git/authorize?team=atharvnaik1%20projects&slug=atharvnaik1s-projects&teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&type=github
-
-Required environment variables (example):
-    VERCEL_ORG_ID=team_c0hqDrZckNBm5AkYTYHVKoE8
-    VERCEL_PROJECT_ID=proj_XXXXXXXXXXXX
-    VERCEL_TOKEN=your_vercel_token
+a team member must authorize the deployment. See the updated
+`VERCEL_AUTH.md` documentation for detailed steps.
 
 Typical Vercel CLI workflow after authorization:
     $ vercel login
@@ -83,6 +76,29 @@ def display_vercel_authorization_steps() -> None:
     print(get_vercel_authorization_instructions())
 
 # --------------------------------------------------------------------------- #
+# Vercel Authorization Documentation Reference Section
+# --------------------------------------------------------------------------- #
+def get_vercel_auth_doc_reference() -> str:
+    """
+    Return a short reference to the VERCEL_AUTH.md documentation file.
+    This file contains the canonical, up‑to‑date instructions for authorizing
+    Vercel deployments for the **atharvnaik1's projects** team.
+    """
+    doc_path = Path(__file__).parent / "VERCEL_AUTH.md"
+    return (
+        "For the most recent and detailed authorization guide, see:\n"
+        f"    {doc_path.resolve()}\n"
+        "\n"
+        "The steps outlined below are a quick‑start summary. Always verify the "
+        "full documentation before proceeding."
+    )
+
+def display_vercel_auth_doc_reference() -> None:
+    """Print the VERCEL_AUTH.md reference to the console."""
+    LOGGER.info("Vercel Authorization Documentation Reference:")
+    print(get_vercel_auth_doc_reference())
+
+# --------------------------------------------------------------------------- #
 # Deploy to Vercel Section
 # --------------------------------------------------------------------------- #
 def get_deploy_to_vercel_instructions() -> str:
@@ -91,7 +107,7 @@ def get_deploy_to_vercel_instructions() -> str:
         "Deploy to Vercel",
         "-----------------",
         "1. Authorize the deployment for the **atharvnaik1's projects** team:",
-        f"   https://vercel.com/git/authorize?team=atharvnaik1%20projects&slug=atharvnaik1s-projects&teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&type=github",
+        f"   {VERCEL_AUTH_URL}",
         "2. Ensure the following environment variables are set:",
         "   - VERCEL_ORG_ID=team_c0hqDrZckNBm5AkYTYHVKoE8",
         "   - VERCEL_PROJECT_ID=proj_XXXXXXXXXXXX",
@@ -105,8 +121,8 @@ def get_deploy_to_vercel_instructions() -> str:
         "6. Deploy the project:",
         "   $ vercel deploy --prod",
         "",
-        "After a successful deployment, Vercel will provide a URL where the service
-        can be accessed."
+        "After a successful deployment, Vercel will provide a URL where the service "
+        "can be accessed."
     ]
     return "\n".join(steps)
 
@@ -203,9 +219,8 @@ def create_virtual_environment(venv_path: Path) -> None:
         VirtualEnvError: If the ``python -m venv`` command fails.
     """
     if venv_path.exists():
-        LOGGER.warning("Virtual environment already exists at %s – skipping creation.", venv_path)
+        LOGGER.warning("Virtual environment already exists at %s", venv_path)
         return
-
     try:
         LOGGER.info("Creating virtual environment at %s", venv_path)
         _run_command([sys.executable, "-m", "venv", str(venv_path)])
@@ -215,23 +230,18 @@ def create_virtual_environment(venv_path: Path) -> None:
 
 
 def install_dependencies(venv_path: Path, requirements_file: Path) -> None:
-    """Install project dependencies using ``pip``.
+    """Install dependencies using pip inside the virtual environment.
 
     Args:
-        venv_path: Path to the previously created virtual environment.
-        requirements_file: Path to a ``requirements.txt`` file.
+        venv_path: Path to the virtual environment.
+        requirements_file: Path to a requirements.txt file.
 
     Raises:
-        FileNotFoundError: If ``requirements.txt`` does not exist.
-        DependencyInstallError: If the ``pip install`` command fails.
+        DependencyInstallError: If pip install fails.
     """
-    if not requirements_file.is_file():
-        raise FileNotFoundError(f"Requirements file not found: {requirements_file}")
-
-    pip_executable = venv_path / ("Scripts" if sys.platform == "win32" else "bin") / "pip"
+    pip_executable = venv_path / "bin" / "pip"
     if not pip_executable.is_file():
-        raise VirtualEnvError(f"pip not found in virtual environment at {pip_executable}")
-
+        raise DependencyInstallError("pip executable not found in virtual environment.")
     try:
         LOGGER.info("Installing dependencies from %s", requirements_file)
         _run_command([str(pip_executable), "install", "-r", str(requirements_file)])
@@ -240,34 +250,28 @@ def install_dependencies(venv_path: Path, requirements_file: Path) -> None:
         raise DependencyInstallError(f"Failed to install dependencies: {exc.output}") from exc
 
 
-def main(repo_url: str, base_dir: Path) -> None:
-    # Example usage flow (can be expanded as needed):
-    repo_dir = base_dir / "repo"
-    venv_path = base_dir / ".venv"
-    requirements_file = repo_dir / "requirements.txt"
+# --------------------------------------------------------------------------- #
+# Main entry point
+# --------------------------------------------------------------------------- #
+def main() -> None:
+    # Example usage (replace with real values as needed)
+    repo_url = "https://github.com/atharvnaik1/ipaship-app-reviewer.git"
+    target_dir = Path.cwd() / "ipaship-app-reviewer"
+    venv_path = target_dir / ".venv"
+    requirements_file = target_dir / "requirements.txt"
 
-    # Step 1: Clone the repository
-    clone_repository(repo_url, repo_dir)
-
-    # Step 2: Create a virtual environment
-    create_virtual_environment(venv_path)
-
-    # Step 3: Install dependencies
-    install_dependencies(venv_path, requirements_file)
-
-    # Step 4: Show Vercel authorization steps
+    # Display Vercel authorization reference before any other actions
+    display_vercel_auth_doc_reference()
     display_vercel_authorization_steps()
 
-    # Step 5: Show Vercel deployment steps
+    # Proceed with setup
+    clone_repository(repo_url, target_dir)
+    create_virtual_environment(venv_path)
+    install_dependencies(venv_path, requirements_file)
+
+    # Finally, show deployment instructions
     display_deploy_to_vercel_instructions()
 
 
 if __name__ == "__main__":
-    # Simple CLI handling (can be replaced with argparse for more robustness)
-    if len(sys.argv) != 3:
-        LOGGER.error("Usage: %s <repo_url> <base_dir>", sys.argv[0])
-        sys.exit(1)
-
-    repo_url_arg = sys.argv[1]
-    base_dir_arg = Path(sys.argv[2]).resolve()
-    main(repo_url_arg, base_dir_arg)
+    main()

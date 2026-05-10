@@ -90,17 +90,15 @@ echo "    Build complete."
 # ─── 8. Vercel Authorization & Deployment ───────
 echo "==> [8/8] Verifying Vercel authentication and team access..."
 
-# Ensure we are logged in or have a token
-if [ -z "${VERCEL_TOKEN:-}" ]; then
-    # No token provided – fall back to interactive login
-    if ! vercel whoami > /dev/null 2>&1; then
-        echo "    Not logged into Vercel. Initiating login..."
-        vercel login
-    fi
+# Ensure a Vercel authentication token is present
+if [ -z "${VERCEL_AUTH:-}" ]; then
+    echo "    Error: VERCEL authentication token not found."
+    echo "    Please follow the instructions in VERCEL_AUTH.md to obtain a token."
+    echo "    Authorization URL: https://vercel.com/git/authorize?team=${VERCEL_TEAM}%20projects&slug=atharvnaik1s-projects&teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&type=github&job=%7B%22headInfo%22%3A%7B%22sha%22%3A%22833c0026d1efad5872766cc67c3da1240cbfaede%22%7D%2C%22id%22%3A%22QmYJzmhhoKdSXfTtDFYoLw4GaNfh5xFvwMhryCFwXaCGs6%22%2C%22org%22%3A%22atharvnaik1%22%2C%22prId%22%3A102%2C%22repo%22%3A%22ipaship-app-reviewer%22%7D"
+    exit 1
 else
-    # Token is set – export for Vercel CLI usage
-    export VERCEL_TOKEN="${VERCEL_TOKEN}"
-    echo "    Using VERCEL_TOKEN for authentication."
+    export VERCEL_TOKEN="${VERCEL_AUTH}"
+    echo "    Using VERCEL_AUTH token for authentication."
 fi
 
 # Verify we have access to the correct team
@@ -118,12 +116,8 @@ if ! vercel link --project "$VERCEL_PROJECT" --git-provider github --repo "athar
     exit 1
 fi
 
-# Deploy to Vercel with the correct team (use token if available)
-if [ -n "${VERCEL_TOKEN:-}" ]; then
-    vercel --prod --team "$VERCEL_TEAM" --token "$VERCEL_TOKEN"
-else
-    vercel --prod --team "$VERCEL_TEAM"
-fi
+# Deploy to Vercel with the correct team (use token)
+vercel --prod --team "$VERCEL_TEAM" --token "$VERCEL_TOKEN"
 echo "    Vercel deployment triggered."
 
 # ─── 9. PM2 ───────────────────────────────────

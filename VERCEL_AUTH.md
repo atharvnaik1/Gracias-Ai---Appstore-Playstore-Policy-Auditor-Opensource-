@@ -1,3 +1,4 @@
+markdown
 # VERCEL Authorization Guide  
 **Target Team:** atharvnaik1’s Projects  
 **Repository:** ipaship-app-reviewer  
@@ -20,6 +21,7 @@ When a pull request is opened on a repository that is linked to a Vercel project
 | **GitHub Access** | Must have write access to the `ipaship-app-reviewer` repository (or be an admin of the organization). |
 | **Browser** | Any modern browser (Chrome, Edge, Firefox, Safari) with cookies enabled. |
 | **Two‑Factor Authentication (2FA)** | If the team enforces 2FA, have the authenticator device ready. |
+| **Environment Variables** | `VERCEL_TOKEN` – a personal Vercel API token with `read` and `write` scopes (required for CI/CD pipelines). |
 
 ---
 
@@ -36,4 +38,4 @@ When a pull request is opened on a repository that is linked to a Vercel project
 
 ### 4.1 Open the Authorization URL  
 
-Copy the following URL (URL‑encoded) into your browser’s address bar:
+Copy the following **URL‑encoded** link into your browser’s address bar and press **Enter**:

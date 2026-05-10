@@ -1,10 +1,10 @@
 json
 {
-  "projectId": "atharvnaik1s-projects",
+  "project": "ipaship-app-reviewer",
   "teamId": "team_c0hqDrZckNBm5AkYTYHVKoE8",
   "slug": "ipaship-app-reviewer",
   "gitRepository": {
-    "slug": "atharvnaik1s-projects"
+    "slug": "ipaship-app-reviewer"
   },
   "build": {
     "src": "src/index.js",
