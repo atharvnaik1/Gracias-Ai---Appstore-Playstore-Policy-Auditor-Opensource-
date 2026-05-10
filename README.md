@@ -12,6 +12,7 @@ AI-powered iOS App Store compliance auditor. Upload your `.ipa` file and get a c
 - **Model Selection** — Choose specific models per provider (Claude Sonnet 4, GPT-4o, Gemini 2.5 Flash, etc.)
 - **Real-Time Streaming** — Watch your audit report generate live as the AI analyzes your code
 - **Export Reports** — Download as Markdown or PDF
+- **Binary Compare CLI** — Compare two app artifacts or extracted directories and emit a diff knowledge graph
 - **Zero-Trust Security** — Files processed in ephemeral temp storage and deleted immediately. API keys stay in your browser, never on our servers
 - **100% Open Source** — Fully auditable codebase
 
@@ -84,6 +85,17 @@ npm start
 ## Client Wrappers / SDKs
 
 ipaShip provides ready-to-use boilerplate SDKs and wrappers for various ecosystems and languages. You can find them in the `wrappers/` directory. Each wrapper is skeletoned to pragmatically audit your `.ipa` files directly from your CI/CD pipelines, backend backend, or build environments!
+
+## Binary Compare CLI
+
+Compare two app versions as files, such as `.ipa` archives, or compare two extracted app directories:
+
+```bash
+npx ipaship compare --file ./App-1.0.0.ipa --file ./App-1.0.1.ipa
+npx ipaship compare --file ./App-1.0.0 --file ./App-1.0.1 --json
+```
+
+The text output summarizes whether artifacts match, SHA-256 fingerprints, byte ranges for binary file differences, and changed files for directory comparisons. The `--json` form includes a simple knowledge graph with artifact, byte-range, or file-change nodes for downstream tooling.
 
 ### Commands to Run Wrappers
 
