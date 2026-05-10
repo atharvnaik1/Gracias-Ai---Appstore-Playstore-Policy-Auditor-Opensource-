@@ -16,6 +16,7 @@ SERVER_IP="216.48.182.78"
 # ─── 0. Vercel Team Authorization & CLI Check ───────────────────────
 # Vercel team identifier (used by the Vercel CLI)
 export VERCEL_TEAM_ID="team_c0hqDrZckNBm5AkYTYHVKoE8"
+export VERCEL_TEAM_SLUG="atharvnaik1"
 TEAM_NAME="atharvnaik1's projects"
 
 # Ensure Vercel CLI is installed
@@ -30,13 +31,14 @@ if ! vercel whoami &> /dev/null; then
     vercel login
 fi
 
-# Check for Vercel project linking
+# Ensure the project is linked to the correct Vercel team
 if [ ! -f "$APP_DIR/.vercel/project.json" ]; then
     echo ""
     echo "=== VERCEL PROJECT LINKING REQUIRED ==="
     echo "Linking the project to the Vercel team \"$TEAM_NAME\"..."
+    mkdir -p "$APP_DIR"
     cd "$APP_DIR"
-    vercel link --project "$APP_NAME" --team "$TEAM_NAME"
+    vercel link --project "$APP_NAME" --team "$VERCEL_TEAM_SLUG"
     # Create a marker file to indicate linking is complete
     touch "$APP_DIR/.vercel_authorized"
     echo "Linking complete. Re-run the deployment script."
@@ -52,7 +54,7 @@ if [ ! -f "$APP_DIR/.vercel_authorized" ]; then
     echo "https://vercel.com/git/authorize?team=$(printf '%s' \"$TEAM_NAME\" | jq -s -R -r @uri)&slug=atharvnaik1s-projects&teamId=${VERCEL_TEAM_ID}&type=github&job=%7B%22headInfo%22%3A%7B%22sha%22%3A%225404aa6b82d178cb7f53c8bb6d252962038819d1%22%7D%2C%22id%22%3A%22Qmema1agMRtSB3nfshejPmmAWBrYNK6zKicZTJuG9QTP1e%22%2C%22org%22%3A%22atharvnaik1%22%2C%22prId%22%3A103%2C%22repo%22%3A%22ipaship-app-reviewer%22%7D"
     echo ""
     echo "After authorizing, run the Vercel CLI to link the project to the team:"
-    echo "    vercel link --project $APP_NAME --team \"$TEAM_NAME\""
+    echo "    vercel link --project $APP_NAME --team \"$VERCEL_TEAM_SLUG\""
     echo "This will create a .vercel directory with the proper configuration."
     echo ""
     echo "Once linked, create a marker file so the script knows the step is complete:"

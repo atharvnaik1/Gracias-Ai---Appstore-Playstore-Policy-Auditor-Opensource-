@@ -54,6 +54,31 @@ python
 # before executing any deployment scripts.
 # ------------------------------------------------------------
 
+# ------------------------------------------------------------
+# Deploying to Vercel
+# ------------------------------------------------------------
+# To deploy this project to Vercel under the "atharvnaik1's projects" team,
+# the team must first be linked and authorized with the GitHub repository.
+#
+# Authorization URL:
+# https://vercel.com/git/authorize?team=atharvnaik1%27s%20projects&slug=atharvnaik1s-projects&teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&type=github&job=%7B%22headInfo%22%3A%7B%22sha%22%3A%225404aa6b82d178cb7f53c8bb6d252962038819d1%22%7D%2C%22id%22%3A%22Qmema1agMRtSB3nfshejPmmAWBrYNK6zKicZTJuG9QTP1e%22%2C%22org%22%3A%22atharvnaik1%22%2C%22prId%22%3A103%2C%22repo%22%3A%22ipaship-app-reviewer%22%7D
+#
+# Steps to deploy after linking the team:
+# 1. Run the authorization URL above and grant Vercel access to the repository.
+# 2. Ensure the environment variables (see section 2 above) are set in Vercel.
+# 3. Execute the deployment script:
+#        ./deploy.sh
+#    The script will:
+#      - Verify VERCEL_TEAM_ID and VERCEL_PROJECT_ID are present.
+#      - Build the Docker image (if Docker deployment is selected).
+#      - Trigger a Vercel production deployment via the Vercel CLI.
+# 4. Monitor the deployment in the Vercel dashboard or via `vercel logs`.
+#
+# The `deploy.sh` script should be placed at the repository root and made
+# executable (`chmod +x deploy.sh`). It can be customized to include additional
+# build steps or environment checks as needed.
+# ------------------------------------------------------------
+
 import os
 import logging
 from typing import Literal, Optional

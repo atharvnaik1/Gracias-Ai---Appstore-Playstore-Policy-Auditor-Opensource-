@@ -8,7 +8,7 @@ application (NVIDIA and Anthropic Claude).  The implementation follows
 production‑grade standards:
 
 *   Typed public interface.
-*   Pydantic‑based validation with clear error messages.
+*   Simple environment‑variable loading (os.getenv) with sensible defaults.
 *   Thread‑safe caching via ``functools.lru_cache``.
 *   Structured logging (debug, info, warning, error) without leaking
     secrets.
@@ -19,12 +19,11 @@ production‑grade standards:
 
 from __future__ import annotations
 
+import os
 import logging
 import re
 from functools import lru_cache
 from typing import Final
-
-from pydantic import BaseSettings, Field, ValidationError, validator
 
 # --------------------------------------------------------------------------- #
 # Logging – configure a handler only if the logger has none to avoid duplicate
@@ -46,110 +45,6 @@ if not LOGGER.handlers:
 # --------------------------------------------------------------------------- #
 class ConfigError(RuntimeError):
     """Raised when configuration cannot be loaded or fails validation."""
-
-
-# --------------------------------------------------------------------------- #
-# Pydantic settings model – validates environment variables or a ``.env`` file.
-# --------------------------------------------------------------------------- #
-class Settings(BaseSettings):
-    """
-    Typed configuration container.
-
-    Attributes
-    ----------
-    nvidia_api_key: str
-        API key for the NVIDIA LLM service.
-    claude_api_key: str
-        API key for the Anthropic Claude service.
-    """
-
-    nvidia_api_key: str = Field(
-        ...,
-        env="NVIDIA_API_KEY",
-        description="API key for NVIDIA LLM service",
-    )
-    claude_api_key: str = Field(
-        ...,
-        env="CLAUDE_API_KEY",
-        description="API key for Anthropic Claude service",
-    )
-
-    @validator("nvidia_api_key", "claude_api_key")
-    def _validate_key(cls, value: str, field) -> str:  # noqa: D401
-        """
-        Validate that a key is a non‑empty string without whitespace and
-        matches the expected pattern (alphanumeric, hyphens, underscores).
-
-        Parameters
-        ----------
-        value: str
-            Raw value supplied by Pydantic.
-        field: ModelField
-            Field being validated.
-
-        Returns
-        -------
-        str
-            Stripped, validated key.
-
-        Raises
-        ------
-        ValueError
-            If the key is empty, contains whitespace, or fails the pattern.
-        """
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError(f"{field.name} must be a non‑empty string")
-        stripped = value.strip()
-        if re.search(r"\s", stripped):
-            raise ValueError(f"{field.name} must not contain whitespace")
-        # Allow only base64‑url‑safe characters, hyphens and underscores.
-        if not re.fullmatch(r"[A-Za-z0-9_-]+", stripped):
-            raise ValueError(
-                f"{field.name} contains illegal characters; only alphanumerics, "
-                "hyphens and underscores are allowed"
-            )
-        return stripped
-
-    class Config:
-        """Pydantic configuration options."""
-
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
-        secrets_dir = None
-
-
-# --------------------------------------------------------------------------- #
-# Cached accessor for the Settings instance
-# --------------------------------------------------------------------------- #
-@lru_cache(maxsize=1)
-def get_settings() -> Settings:
-    """
-    Load and cache the :class:`Settings` instance.
-
-    Returns
-    -------
-    Settings
-        Validated configuration object.
-
-    Raises
-    ------
-    ConfigError
-        If the configuration cannot be loaded or fails validation.
-    """
-    try:
-        settings = Settings()
-        LOGGER.debug("Configuration loaded successfully")
-        return settings
-    except ValidationError as exc:
-        LOGGER.error("Configuration validation failed: %s", exc)
-        raise ConfigError("Invalid configuration") from exc
-    except OSError as exc:
-        LOGGER.error("I/O error while loading configuration: %s", exc)
-        raise ConfigError("Unable to read configuration file") from exc
-    except Exception as exc:  # pragma: no cover
-        LOGGER.exception("Unexpected error while loading configuration")
-        raise ConfigError("Unexpected configuration error") from exc
 
 
 # --------------------------------------------------------------------------- #
@@ -176,6 +71,83 @@ def _mask_key(key: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
+# Validation utilities
+# --------------------------------------------------------------------------- #
+def _validate_key(value: str | None, name: str) -> str:
+    """
+    Validate that a key is a non‑empty string without whitespace and
+    matches the expected pattern (alphanumeric, hyphens, underscores).
+
+    Parameters
+    ----------
+    value: str | None
+        Raw value supplied from the environment.
+    name: str
+        Human‑readable name of the variable for error messages.
+
+    Returns
+    -------
+    str
+        Stripped, validated key.
+
+    Raises
+    ------
+    ConfigError
+        If the key is missing, empty, contains whitespace, or fails the pattern.
+    """
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError(f"{name} must be a non‑empty string")
+    stripped = value.strip()
+    if re.search(r"\s", stripped):
+        raise ConfigError(f"{name} must not contain whitespace")
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", stripped):
+        raise ConfigError(
+            f"{name} contains illegal characters; only alphanumerics, "
+            "hyphens and underscores are allowed"
+        )
+    return stripped
+
+
+# --------------------------------------------------------------------------- #
+# Cached accessor for the configuration
+# --------------------------------------------------------------------------- #
+@lru_cache(maxsize=1)
+def _load_config() -> dict[str, str]:
+    """
+    Load configuration from environment variables, validate, and cache it.
+
+    Returns
+    -------
+    dict[str, str]
+        Mapping with keys ``nvidia_api_key`` and ``claude_api_key``.
+
+    Raises
+    ------
+    ConfigError
+        If any required variable is missing or invalid.
+    """
+    try:
+        nvidia_raw = os.getenv("NVIDIA_API_KEY")
+        claude_raw = os.getenv("CLAUDE_API_KEY")
+
+        nvidia_key = _validate_key(nvidia_raw, "NVIDIA_API_KEY")
+        claude_key = _validate_key(claude_raw, "CLAUDE_API_KEY")
+
+        LOGGER.debug(
+            "Configuration loaded: NVIDIA=%s, Claude=%s",
+            _mask_key(nvidia_key),
+            _mask_key(claude_key),
+        )
+        return {"nvidia_api_key": nvidia_key, "claude_api_key": claude_key}
+    except ConfigError as exc:
+        LOGGER.error("Configuration validation failed: %s", exc)
+        raise
+    except Exception as exc:  # pragma: no cover
+        LOGGER.exception("Unexpected error while loading configuration")
+        raise ConfigError("Unexpected configuration error") from exc
+
+
+# --------------------------------------------------------------------------- #
 # Public getters – cached for performance, never log the full key
 # --------------------------------------------------------------------------- #
 @lru_cache(maxsize=1)
@@ -194,7 +166,7 @@ def get_nvidia_key() -> str:
         If the key cannot be obtained.
     """
     try:
-        key = get_settings().nvidia_api_key
+        key = _load_config()["nvidia_api_key"]
         LOGGER.debug("NVIDIA API key accessed: %s", _mask_key(key))
         return key
     except ConfigError:
@@ -221,7 +193,7 @@ def get_claude_key() -> str:
         If the key cannot be obtained.
     """
     try:
-        key = get_settings().claude_api_key
+        key = _load_config()["claude_api_key"]
         LOGGER.debug("Claude API key accessed: %s", _mask_key(key))
         return key
     except ConfigError:
@@ -236,9 +208,7 @@ def get_claude_key() -> str:
 # Public API of the module
 # --------------------------------------------------------------------------- #
 __all__: list[str] = [
-    "Settings",
     "ConfigError",
-    "get_settings",
     "get_nvidia_key",
     "get_claude_key",
 ]
