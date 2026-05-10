@@ -1,9 +1,9 @@
 python
 # ------------------------------------------------------------
-# Vercel Deployment Authorization & Process Documentation
+# Vercel & Docker Deployment Documentation
 # ------------------------------------------------------------
 # This project is deployed to Vercel under the
-# "atharvnaik1's projects" team.
+# "atharvnaik1's projects" team and can also be run via Docker.
 #
 # 1. Authorization
 #    A team member must authorize the GitHub integration before
@@ -15,28 +15,43 @@ python
 # 2. Required Environment Variables
 #    - VERCEL_TEAM_ID: The Vercel team identifier (e.g., team_c0hqDrZckNBm5AkYTYHVKoE8)
 #    - VERCEL_PROJECT_ID: The Vercel project identifier (optional, if using the Vercel CLI)
+#    - DOCKER_IMAGE: Name of the Docker image to build/push (e.g., ghcr.io/yourorg/yourapp)
+#    - DOCKER_REGISTRY: Docker registry URL (e.g., ghcr.io)
 #    - Additional project‑specific variables (API keys, endpoints, etc.) must be set
 #      in a .env file or the deployment environment.
 #
 # 3. Deployment Steps
 #    a. Ensure the repository is authorized (step 1).
 #    b. Verify that all required environment variables are present.
-#    c. Run the Vercel CLI to deploy:
+#    c. Vercel deployment:
 #          vercel --prod --confirm
 #       or trigger a deployment via the Vercel dashboard.
-#    d. Monitor the deployment status on Vercel; any missing
+#    d. Docker deployment:
+#          # Build the image
+#          docker build -t $DOCKER_IMAGE .
+#          # Push to registry
+#          docker push $DOCKER_IMAGE
+#          # Run container
+#          docker run -d -p 8080:8080 --env-file .env $DOCKER_IMAGE
+#    e. Monitor the deployment status on Vercel; any missing
 #       authorization or env vars will cause the deployment to fail.
 #
-# Contributors should verify authorization and env vars before
-# executing any deployment scripts.
-# ------------------------------------------------------------
-
-# ------------------------------------------------------------
-# Additional Deployment Authorization Note
-# ------------------------------------------------------------
-# The Vercel team (atharvnaik1's projects) must explicitly authorize
-# the deployment by visiting the link above. Without this
-# authorization, Vercel will reject any deployment attempts.
+# 4. Troubleshooting Vercel Errors
+#    - **Error: Deployment failed** – Check the Vercel dashboard logs for
+#      detailed error messages. Common causes include:
+#        * Missing or incorrect VERCEL_TEAM_ID / VERCEL_PROJECT_ID
+#        * Unauthorised GitHub integration (re‑run the authorization URL)
+#        * Missing required environment variables (see section 2)
+#    - **Fixes**:
+#        1. Re‑run the authorization URL to re‑grant permissions.
+#        2. Verify that all env vars are correctly set in Vercel's
+#           Environment Variables UI or in the .env file.
+#        3. Ensure the Dockerfile (if used) builds without errors.
+#        4. If the error persists, run `vercel logs <deployment-id>` to fetch
+#           runtime logs and address the specific issue.
+#
+# Contributors should verify authorization, env vars, and Docker setup
+# before executing any deployment scripts.
 # ------------------------------------------------------------
 
 import os
@@ -76,6 +91,10 @@ class Settings(BaseSettings):
     # Vercel deployment configuration
     vercel_team_id: str = Field(..., env="VERCEL_TEAM_ID")
     vercel_project_id: Optional[str] = Field(None, env="VERCEL_PROJECT_ID")
+
+    # Docker deployment configuration (optional)
+    docker_image: Optional[str] = Field(None, env="DOCKER_IMAGE")
+    docker_registry: Optional[str] = Field(None, env="DOCKER_REGISTRY")
 
     @validator("nvidia_api_key", "claude_api_key", "vercel_team_id")
     def not_empty(cls, v: str) -> str:

@@ -1,17 +1,21 @@
+json
 {
   "version": 2,
   "name": "atharvnaik1s-projects",
   "teamId": "team_c0hqDrZckNBm5AkYTYHVKoE8",
-  "builds": [
-    {
-      "src": "next.config.js",
-      "use": "@vercel/next"
-    }
-  ],
+  "build": {
+    "src": "next.config.mjs",
+    "use": "@vercel/next"
+  },
+  "outputDirectory": "out",
   "routes": [
     {
       "src": "/(.*)",
       "dest": "/$1"
     }
-  ]
+  ],
+  "env": {
+    "MONGODB_URI": "mongodb+srv://<username>:<password>@cluster0.mongodb.net/<dbname>?retryWrites=true&w=majority",
+    "MONGODB_DB": "mydatabase"
+  }
 }

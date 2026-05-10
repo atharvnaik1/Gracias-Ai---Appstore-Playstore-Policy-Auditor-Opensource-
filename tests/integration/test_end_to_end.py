@@ -1,3 +1,4 @@
+python
 # tests/integration/test_end_to_end.py
 """
 Integration tests for the unified LLM service.
@@ -11,7 +12,7 @@ completion payloads.
 import os
 import json
 import logging
-from typing import Dict
+from typing import Dict, List
 
 import pytest
 import responses
@@ -36,7 +37,7 @@ class MockProviderResponse(BaseModel):
     object: str
     created: int
     model: str
-    choices: list
+    choices: List[Dict]
 
 
 def _mock_nvidia_endpoint(prompt: str) -> Dict:
@@ -75,17 +76,29 @@ def _mock_claude_endpoint(prompt: str) -> Dict:
     }
 
 
+def _mock_health_endpoint() -> Dict:
+    """Mock health endpoint payload."""
+    return {"status": "ok"}
+
+
 # --------------------------------------------------------------------------- #
 # Fixtures
 # --------------------------------------------------------------------------- #
 
 @pytest.fixture(autouse=True)
-def set_api_keys(monkeypatch):
+def set_api_and_vercel_keys(monkeypatch):
     """
-    Ensure API keys are present in the environment for the duration of the tests.
+    Ensure API keys and Vercel environment variables are present for the duration of the tests.
     """
+    # API keys for providers
     monkeypatch.setenv("NVIDIA_API_KEY", "test-nvidia-key")
     monkeypatch.setenv("CLAUDE_API_KEY", "test-claude-key")
+    # Vercel environment variables
+    monkeypatch.setenv("VERCEL_URL", "http://localhost:3000")
+    monkeypatch.setenv("VERCEL_ENV", "development")
+    monkeypatch.setenv("VERCEL_GIT_COMMIT_SHA", "dummysha123456")
+    # Timeout configuration (seconds)
+    monkeypatch.setenv("REQUEST_TIMEOUT", "5")
     yield
     # No cleanup required – monkeypatch restores the original environment.
 
@@ -93,7 +106,8 @@ def set_api_keys(monkeypatch):
 @pytest.fixture
 def mock_responses():
     """
-    Activate the ``responses`` library and register mock endpoints for both providers.
+    Activate the ``responses`` library and register mock endpoints for both providers
+    and the health check.
     """
     with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
         # NVIDIA mock endpoint
@@ -109,6 +123,14 @@ def mock_responses():
             method=responses.POST,
             url="https://api.anthropic.com/v1/completions",
             json=_mock_claude_endpoint("{{prompt}}"),
+            status=200,
+            content_type="application/json",
+        )
+        # Health endpoint mock
+        rsps.add(
+            method=responses.GET,
+            url="http://localhost:3000/api/health",
+            json=_mock_health_endpoint(),
             status=200,
             content_type="application/json",
         )
@@ -205,3 +227,16 @@ def test_invalid_provider():
             temperature=0.0,
         )
     assert "Unsupported provider" in str(excinfo.value)
+
+
+def test_health_endpoint(mock_responses):
+    """
+    Verify that the health endpoint returns a 200 status with the expected JSON payload.
+    """
+    service = LLMService()
+    # Assuming the service exposes a ``health_check`` method that hits the health URL.
+    health = service.health_check()
+    assert isinstance(health, dict)
+    assert health.get("status") == "ok"
+    # Ensure the health mock endpoint was called exactly once.
+    assert len([call for call in mock_responses.calls if "/api/health" in call.request.url]) == 1

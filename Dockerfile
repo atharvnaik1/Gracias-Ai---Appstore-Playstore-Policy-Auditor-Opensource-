@@ -1,55 +1,37 @@
+dockerfile
 # syntax=docker/dockerfile:1.4
 
 ############################
 # Build stage
 ############################
-FROM python:3.11-slim AS builder
+FROM node:20-alpine AS builder
 
-# Install build‑time dependencies (gcc, libpq-dev, etc.) for any compiled wheels
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc libpq-dev && \
-    rm -rf /var/lib/apt/lists/*
-
-# Set a deterministic working directory
+# Set working directory
 WORKDIR /app
 
-# Install Python dependencies in a clean environment
-COPY requirements.txt .
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# Install only production dependencies
+COPY package*.json ./
+RUN npm ci --only=production
+
+# Copy application source files (excluding files matched by .dockerignore)
+COPY . .
 
 ############################
 # Runtime stage
 ############################
-FROM python:3.11-slim
+FROM node:20-alpine
 
-# Create a non‑root user for security
-RUN groupadd --gid 1000 appgroup && \
-    useradd --uid 1000 --gid 1000 --shell /usr/sbin/nologin --create-home appuser
-
-# Copy only the compiled packages from the builder stage
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
-
-# Set the working directory for the runtime image
+# Set working directory
 WORKDIR /app
 
-# Copy application source code (excluding files matched by .dockerignore)
-COPY . .
+# Copy only the installed production dependencies from the builder stage
+COPY --from=builder /app/node_modules ./node_modules
 
-# Switch to the non‑root user
-USER appuser
+# Copy the application source code from the builder stage
+COPY --from=builder /app ./
 
-# Runtime environment variables – values are injected at container start‑up
-ENV NVIDIA_API_KEY=${NVIDIA_API_KEY}
-ENV ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+# Expose the HTTP port used by the service
+EXPOSE 3000
 
-# Expose the HTTP port used by the service (adjust if needed)
-EXPOSE 8000
-
-# Simple health‑check endpoint (adjust path if your app uses a different one)
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-# Default command – replace `myapp.main` with your actual entry module
-CMD ["python", "-m", "myapp.main"]
+# Default command
+CMD ["npm", "start"]

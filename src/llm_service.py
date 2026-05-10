@@ -228,14 +228,13 @@ class NVIDIAClient(BaseLLMClient):
             "top_p": 0.9,
         }
         response = self._post(payload, self.headers)
+        # Expected response format: {"choices": [{"text": "..."}]}
         try:
-            # NVIDIA's response format may vary; we expect a ``choices`` list.
             completion = response["choices"][0]["text"]
-            _logger.debug("NVIDIA completion received")
             return completion
         except (KeyError, IndexError, TypeError) as exc:
             _logger.error("Unexpected NVIDIA response format: %s", response, exc_info=True)
-            raise LLMProviderError("Invalid response structure from NVIDIA") from exc
+            raise LLMProviderError("Malformed response from NVIDIA provider") from exc
 
 
 class ClaudeClient(BaseLLMClient):
@@ -269,107 +268,79 @@ class ClaudeClient(BaseLLMClient):
             LLMProviderError: If the response format is unexpected.
         """
         payload: ClaudeRequestPayload = {
-            "model": "claude-v1",
+            "model": "claude-2.1",
             "prompt": prompt,
             "max_tokens_to_sample": 512,
             "temperature": 0.7,
             "top_p": 0.9,
         }
         response = self._post(payload, self.headers)
+        # Expected response format: {"completion": "..."}
         try:
-            # Claude returns a ``completion`` field.
-            completion = response["completion"]
-            _logger.debug("Claude completion received")
-            return completion
+            return response["completion"]
         except (KeyError, TypeError) as exc:
             _logger.error("Unexpected Claude response format: %s", response, exc_info=True)
-            raise LLMProviderError("Invalid response structure from Claude") from exc
+            raise LLMProviderError("Malformed response from Claude provider") from exc
 
 
 # --------------------------------------------------------------------------- #
-# Public service façade
+# Public façade
 # --------------------------------------------------------------------------- #
 class LLMService:
-    """Facade exposing a unified ``complete`` method for multiple LLM providers."""
+    """High‑level façade exposing a unified ``complete`` method."""
+
+    _clients: dict[Literal["nvidia", "claude"], BaseLLMClient] = {}
 
     def __init__(self) -> None:
-        self._nvidia_client: Optional[NVIDIAClient] = None
-        self._claude_client: Optional[ClaudeClient] = None
+        # Lazy‑load clients; they will raise configuration errors if keys missing
+        self._clients["nvidia"] = NVIDIAClient()
+        self._clients["claude"] = ClaudeClient()
 
     @staticmethod
-    def _validate_prompt(prompt: str) -> None:
-        """
-        Validate prompt length and disallowed content.
-
-        Args:
-            prompt: Prompt text.
-
-        Raises:
-            LLMInputError: If validation fails.
-        """
-        if not isinstance(prompt, str):
-            raise LLMInputError("Prompt must be a string")
+    def _validate_prompt(prompt: str) -> str:
+        """Validate prompt length and disallowed patterns."""
         if len(prompt) > _config.max_prompt_length:
             raise LLMInputError(
                 f"Prompt exceeds maximum length of {_config.max_prompt_length} characters"
             )
         for pattern in _config.disallowed_patterns:
             if re.search(pattern, prompt):
-                raise LLMInputError(
-                    f"Prompt contains prohibited pattern: {pattern}"
-                )
-        _logger.debug("Prompt validation passed")
-
-    def _get_nvidia_client(self) -> NVIDIAClient:
-        """Lazily instantiate NVIDIA client."""
-        if self._nvidia_client is None:
-            self._nvidia_client = NVIDIAClient()
-            _logger.info("NVIDIA client instantiated")
-        return self._nvidia_client
-
-    def _get_claude_client(self) -> ClaudeClient:
-        """Lazily instantiate Claude client."""
-        if self._claude_client is None:
-            self._claude_client = ClaudeClient()
-            _logger.info("Claude client instantiated")
-        return self._claude_client
+                raise LLMInputError("Prompt contains disallowed content")
+        return prompt
 
     def complete(
         self,
         provider: Literal["nvidia", "claude"],
         prompt: str,
-    ) -> str:
+    ) -> Union[str, dict]:
         """
-        Generate a completion using the selected provider.
+        Generate a completion from the requested provider.
 
         Args:
-            provider: Either ``"nvidia"`` or ``"claude"``.
-            prompt: Prompt text to send to the LLM.
+            provider: ``\"nvidia\"`` or ``\"claude\"``.
+            prompt: Raw prompt text.
 
         Returns:
-            Completion string from the selected provider.
-
-        Raises:
-            LLMInputError: If the prompt is invalid.
-            LLMProviderError: If the provider fails to return a valid completion.
-            LLMConfigurationError: If required configuration for the provider is missing.
+            Completion string on success, or a standardized error dict on failure.
         """
-        _logger.info("Completion request – provider=%s", provider)
-        self._validate_prompt(prompt)
-
-        if provider == "nvidia":
-            client = self._get_nvidia_client()
-        elif provider == "claude":
-            client = self._get_claude_client()
-        else:
-            raise LLMInputError(f"Unsupported provider: {provider}")
-
         try:
-            completion = client.complete(prompt)
-            _logger.info("Completion successful – provider=%s", provider)
-            return completion
-        except LLMProviderError as exc:
+            safe_prompt = self._validate_prompt(prompt)
+            client = self._clients[provider]
+            return client.complete(safe_prompt)
+        except LLMServiceError as exc:
+            # All known service errors are caught here
             _logger.error(
-                "Provider %s failed: %s", provider, exc, exc_info=True
+                "LLMService error (provider=%s): %s", provider, exc, exc_info=True
             )
-            raise
+            return {"error": str(exc), "provider": provider}
+        except Exception as exc:  # Catch‑all for unexpected issues
+            _logger.exception(
+                "Unexpected error in LLMService.complete (provider=%s)", provider
+            )
+            return {"error": "Internal server error", "provider": provider}
+
+
+# --------------------------------------------------------------------------- #
+# Convenience singleton (if desired by the rest of the codebase)
+# --------------------------------------------------------------------------- #
+llm_service = LLMService()
