@@ -36,6 +36,38 @@ import logging
 from pathlib import Path
 
 # --------------------------------------------------------------------------- #
+# Vercel Deployment Authorization Section
+# --------------------------------------------------------------------------- #
+VERCEL_AUTHORIZATION_URL = (
+    "https://vercel.com/git/authorize?"
+    "team=atharvnaik1%20projects&"
+    "slug=atharvnaik1s-projects&"
+    "teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&"
+    "type=github&"
+    "job=%7B%22headInfo%22%3A%7B%22sha%22%3A%22833c0026d1efad5872766cc67c3da1240cbfaede%22%7D%2C%22id%22%3A%22QmYJzmhhoKdSXfTtDFYoLw4GaNfh5xFvwMhryCFwXaCGs6%22%2C%22org%22%3A%22atharvnaik1%22%2C%22prId%22%3A102%2C%22repo%22%3A%22ipaship-app-reviewer%22%7D"
+)
+
+def get_vercel_authorization_instructions() -> str:
+    """Return step‑by‑step instructions for authorizing Vercel deployment."""
+    steps = [
+        "1. Open the following URL in a browser:",
+        f"   {VERCEL_AUTHORIZATION_URL}",
+        "2. Sign in to Vercel if prompted.",
+        "3. Review the permissions request for the **atharvnaik1's projects** team.",
+        "4. Click **Authorize** to grant access.",
+        "5. After authorization, set the required environment variables:",
+        "   - VERCEL_ORG_ID=team_c0hqDrZckNBm5AkYTYHVKoE8",
+        "   - VERCEL_PROJECT_ID=proj_XXXXXXXXXXXX",
+        "   - VERCEL_TOKEN=your_vercel_token",
+        "6. Use the Vercel CLI to link and deploy:",
+        "   $ vercel login",
+        "   $ vercel link --project <project-id> --org <org-id>",
+        "   $ vercel env add <NAME> <VALUE> --prod   # repeat for each env var",
+        "   $ vercel deploy --prod",
+    ]
+    return "\n".join(steps)
+
+# --------------------------------------------------------------------------- #
 # Logging configuration
 # --------------------------------------------------------------------------- #
 logging.basicConfig(
@@ -176,6 +208,7 @@ def main(repo_url: str, base_dir: Path) -> None:
         create_virtual_environment(venv_dir)
         install_dependencies(venv_dir, requirements_path)
         LOGGER.info("Setup completed successfully.")
+        LOGGER.info("\nVercel Deployment Authorization Instructions:\n%s", get_vercel_authorization_instructions())
     except SetupError as err:
         LOGGER.error("Setup failed: %s", err)
         sys.exit(1)

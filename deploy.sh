@@ -13,6 +13,7 @@ NODE_MAJOR=20
 APP_PORT=8080
 SERVER_IP="216.48.182.78"
 VERCEL_TEAM="atharvnaik1"
+VERCEL_PROJECT="ipaship"   # Vercel project name (must match the Vercel dashboard)
 
 echo ""
 echo "=========================================="
@@ -86,27 +87,43 @@ echo "    Building Next.js app..."
 npm run build 2>&1 | tail -5
 echo "    Build complete."
 
-# ─── 8. Deploy to Vercel ───────────────────────
-echo "==> [8/8] Deploying to Vercel..."
-# Verify Vercel authentication
+# ─── 8. Vercel Authorization & Deployment ───────
+echo "==> [8/8] Verifying Vercel authentication and team access..."
+
+# Ensure we are logged in
 if ! vercel whoami > /dev/null 2>&1; then
-    echo "    Vercel not authorized. Please run 'vercel login' and authorize the team."
+    echo "    Not logged into Vercel. Initiating login..."
+    vercel login
+fi
+
+# Verify we have access to the correct team
+if ! vercel teams list | grep -q "$VERCEL_TEAM"; then
+    echo "    Error: Vercel team '$VERCEL_TEAM' not found in your account."
+    echo "    Please ensure you are a member of the team and re-run the script."
     exit 1
 fi
 
-# Deploy with team flag
+# Link the repository to the Vercel project (fails if repo not authorized)
+if ! vercel link --project "$VERCEL_PROJECT" --git-provider github --repo "atharvnaik1/ipaShip-Ai---Appstore-Playstore-Policy-Auditor-Opensource-" --team "$VERCEL_TEAM" > /dev/null 2>&1; then
+    echo "    Error: Repository is not authorized for team '$VERCEL_TEAM'."
+    echo "    Please authorize the repository via the Vercel dashboard or the provided URL."
+    echo "    https://vercel.com/git/authorize?team=${VERCEL_TEAM}%20projects&slug=atharvnaik1s-projects&teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&type=github&job=%7B%22headInfo%22%3A%7B%22sha%22%3A%22833c0026d1efad5872766cc67c3da1240cbfaede%22%7D%2C%22id%22%3A%22QmYJzmhhoKdSXfTtDFYoLw4GaNfh5xFvwMhryCFwXaCGs6%22%2C%22org%22%3A%22atharvnaik1%22%2C%22prId%22%3A102%2C%22repo%22%3A%22ipaship-app-reviewer%22%7D"
+    exit 1
+fi
+
+# Deploy to Vercel with the correct team
 vercel --prod --team "$VERCEL_TEAM"
 echo "    Vercel deployment triggered."
 
-# ─── PM2 ───────────────────────────────────
-echo "==> [9/8] Starting app with PM2..."
+# ─── 9. PM2 ───────────────────────────────────
+echo "==> [9/9] Starting app with PM2..."
 pm2 delete "$APP_NAME" 2>/dev/null || true
 cd "$APP_DIR"
 PORT=$APP_PORT pm2 start npm --name "$APP_NAME" -- start
 pm2 save > /dev/null 2>&1
 pm2 startup systemd -u root --hp /root > /dev/null 2>&1 || true
 
-# ─── Nginx ─────────────────────────────────────
+# ─── 10. Nginx ─────────────────────────────────────
 echo "==> Configuring Nginx..."
 cat > /etc/nginx/sites-available/ipaship << NGINXEOF
 server {
@@ -150,7 +167,7 @@ nginx -t 2>&1 | head -2
 systemctl enable nginx > /dev/null 2>&1
 systemctl restart nginx
 
-# ─── Firewall ──────────────────────────────────
+# ─── 11. Firewall ──────────────────────────────────
 echo "==> Configuring firewall..."
 ufw allow OpenSSH > /dev/null 2>&1
 ufw allow 'Nginx Full' > /dev/null 2>&1
