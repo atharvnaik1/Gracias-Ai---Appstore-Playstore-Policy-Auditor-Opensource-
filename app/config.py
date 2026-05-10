@@ -1,14 +1,17 @@
+python
 """
 app/config.py
 
 Configuration module for the micro‑service.
 
-- Loads environment variables (including a optional ``.env`` file) via
+* Loads environment variables (optionally from a ``.env`` file) via
   ``python‑dotenv``.
-- Provides a typed ``Settings`` object based on ``pydantic.BaseSettings``.
-- Validates the presence of required secrets (NVIDIA and Claude API keys).
-- Exposes a singleton ``get_settings`` helper for the rest of the project.
-- Configures a module‑level logger for consistent logging.
+* Provides a typed ``Settings`` object based on ``pydantic.BaseSettings``.
+* Validates required secrets (NVIDIA and Claude API keys) and numeric
+  configuration values.
+* Exposes a cached singleton ``get_settings`` helper for the rest of the
+  project.
+* Configures a module‑level logger for consistent, structured logging.
 """
 
 from __future__ import annotations
@@ -17,24 +20,18 @@ import logging
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from dotenv import load_dotenv
 from pydantic import BaseSettings, Field, ValidationError, validator
 
 # --------------------------------------------------------------------------- #
-# Load ``.env`` if it exists – this is a no‑op when the file is absent.
+# Logging configuration – a single logger is shared across the package.
 # --------------------------------------------------------------------------- #
-dotenv_path = Path(__file__).resolve().parents[1] / ".env"
-if dotenv_path.is_file():
-    load_dotenv(dotenv_path)
+_logger_name = "app.config"
+logger = logging.getLogger(_logger_name)
 
-# --------------------------------------------------------------------------- #
-# Logger configuration – the same logger name is used throughout the package.
-# --------------------------------------------------------------------------- #
-logger = logging.getLogger("app.config")
-if not logger.handlers:
-    # Prevent duplicate handlers in interactive sessions.
+if not logger.handlers:  # pragma: no‑cover – guard for interactive sessions.
     handler = logging.StreamHandler()
     formatter = logging.Formatter(
         fmt="%(asctime)s %(levelname)s %(name)s %(message)s",
@@ -45,14 +42,33 @@ if not logger.handlers:
     logger.setLevel(os.getenv("LOG_LEVEL", "INFO").upper())
 
 # --------------------------------------------------------------------------- #
+# Load a ``.env`` file if present – no‑op when the file does not exist.
+# --------------------------------------------------------------------------- #
+_env_path = Path(__file__).resolve().parents[1] / ".env"
+if _env_path.is_file():
+    try:
+        load_dotenv(_env_path)
+        logger.debug("Loaded environment variables from %s", _env_path)
+    except Exception as exc:  # pragma: no‑cover – defensive programming.
+        logger.warning("Failed to load .env file %s: %s", _env_path, exc)
+
+# --------------------------------------------------------------------------- #
+# Custom exception to make configuration failures explicit.
+# --------------------------------------------------------------------------- #
+class ConfigError(RuntimeError):
+    """Raised when the application configuration cannot be validated."""
+
+
+# --------------------------------------------------------------------------- #
 # Settings model – all configuration values are read from environment variables.
 # --------------------------------------------------------------------------- #
 class Settings(BaseSettings):
     """
     Typed configuration holder.
 
-    The values are read from environment variables (or a ``.env`` file) on
-    first import.  ``pydantic`` performs type conversion and validation.
+    ``pydantic`` reads values from the environment (or the optional ``.env``
+    file) and validates them on instantiation.  The model is immutable by
+    default – any change must go through ``Settings`` validation.
     """
 
     # ------------------------------------------------------------------- #
@@ -106,22 +122,23 @@ class Settings(BaseSettings):
     # Validators.
     # ------------------------------------------------------------------- #
     @validator("TIMEOUT", "RETRY_COUNT", "MAX_CONCURRENT_REQUESTS")
-    def _positive_int(cls, v: int, field):  # noqa: D401
-        """Ensure integer‑type settings are positive."""
+    def _positive_int(cls, v: int, field) -> int:  # noqa: D401
+        """Ensure integer‑type settings are strictly positive."""
         if v <= 0:
             raise ValueError(f"{field.name} must be a positive integer")
         return v
 
     @validator("NVIDIA_API_KEY", "CLAUDE_API_KEY")
-    def _non_empty_key(cls, v: str, field):  # noqa: D401
-        """Ensure API keys are not empty strings."""
-        if not v.strip():
+    def _non_empty_key(cls, v: str, field) -> str:  # noqa: D401
+        """Ensure API keys are non‑empty, whitespace‑stripped strings."""
+        stripped = v.strip()
+        if not stripped:
             raise ValueError(f"{field.name} cannot be empty")
-        return v.strip()
+        return stripped
 
 
 # --------------------------------------------------------------------------- #
-# Cached singleton accessor – cheap and thread‑safe.
+# Cached singleton accessor – cheap, thread‑safe and lazy.
 # --------------------------------------------------------------------------- #
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
@@ -137,13 +154,13 @@ def get_settings() -> Settings:
         return settings
     except ValidationError as exc:
         logger.error("Configuration validation failed: %s", exc)
-        raise
+        raise ConfigError("Invalid configuration") from exc
 
 
 # --------------------------------------------------------------------------- #
-# Convenience constants for external modules that prefer a plain dict.
+# Convenience helpers.
 # --------------------------------------------------------------------------- #
-def as_dict() -> dict:
+def as_dict() -> dict[str, Any]:
     """
     Return the current configuration as a plain ``dict`` – useful for
     serialising or passing to libraries that do not understand ``BaseSettings``.
@@ -151,7 +168,18 @@ def as_dict() -> dict:
     return get_settings().model_dump()
 
 
+def reload_settings() -> Settings:
+    """
+    Force a reload of the configuration, clearing the cache.
+
+    This is handy in long‑running processes when environment variables may
+    change at runtime (e.g. during tests).
+    """
+    get_settings.cache_clear()
+    return get_settings()
+
+
 # --------------------------------------------------------------------------- #
 # Exported symbols – keep the public surface explicit.
 # --------------------------------------------------------------------------- #
-__all__ = ["Settings", "get_settings", "as_dict", "logger"]
+__all__: list[str] = ["Settings", "get_settings", "as_dict", "reload_settings", "logger", "ConfigError"]

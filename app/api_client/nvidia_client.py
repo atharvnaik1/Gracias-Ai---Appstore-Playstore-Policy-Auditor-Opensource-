@@ -1,9 +1,10 @@
+python
 # app/api_client/nvidia_client.py
 """
 Thin wrapper around the NVIDIA LLM REST API.
 
 The client builds authenticated requests, sends them using ``httpx`` and parses
-the JSON response into a typed ``NvidiaResponse`` model.  Errors from the
+the JSON response into a typed ``NvidiaResponse`` model. Errors from the
 service are mapped to a small hierarchy of custom exceptions.
 
 The module also provides a small helper to retrieve the NVIDIA API key from
@@ -14,11 +15,10 @@ project can rely on a single source of truth for secrets.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 from dataclasses import dataclass
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, Literal, Optional, Sequence
 
 import httpx
 from dotenv import load_dotenv
@@ -46,7 +46,7 @@ if not _logger.handlers:
 
 
 # --------------------------------------------------------------------------- #
-# Public helper to obtain API keys
+# Public helpers to obtain API keys
 # --------------------------------------------------------------------------- #
 def get_nvidia_api_key() -> str:
     """
@@ -139,7 +139,7 @@ class NvidiaResponse(BaseModel):
     object: Literal["text_completion"] = Field(..., description="Object type")
     created: int = Field(..., description="Unix timestamp of generation")
     model: str = Field(..., description="Model used")
-    choices: list[NvidiaChoice] = Field(..., description="Generated choices")
+    choices: Sequence[NvidiaChoice] = Field(..., description="Generated choices")
     usage: Optional[Dict[str, int]] = Field(
         None,
         description="Token usage statistics (prompt/completion/total)",
@@ -180,18 +180,15 @@ class NvidiaClient:
     Parameters
     ----------
     base_url : str, optional
-        Base URL of the NVIDIA endpoint.  Defaults to the official public URL.
+        Base URL of the NVIDIA endpoint. Defaults to the official public URL.
     timeout : float, optional
-        Request timeout in seconds.  ``30.0`` seconds is a safe default.
+        Request timeout in seconds. ``30.0`` seconds is a safe default.
     """
 
     base_url: str = "https://api.nvcf.nvidia.com/v1/completions"
     timeout: float = 30.0
 
     def __post_init__(self) -> None:
-        # ``httpx.AsyncClient`` is deliberately *not* stored on the dataclass
-        # because it must be created per‑call to avoid keeping open connections
-        # across process forks (e.g. when using Gunicorn/Uvicorn workers).
         _logger.debug("NvidiaClient initialised with base_url=%s", self.base_url)
 
     async def generate(
@@ -206,17 +203,14 @@ class NvidiaClient:
         """
         Generate a completion for ``prompt`` using the NVIDIA LLM service.
 
-        The method builds a request payload, adds the ``Authorization`` header,
-        sends the request and returns the generated text of the first choice.
-
         Parameters
         ----------
         prompt : str
             The user prompt to send to the model.
         model : str, optional
-            Model identifier.  Defaults to a widely‑available Llama‑3 model.
+            Model identifier. Defaults to a widely‑available Llama‑3 model.
         temperature : float, optional
-            Sampling temperature (0.0‑2.0).  ``None`` lets the provider use its default.
+            Sampling temperature (0.0‑2.0). ``None`` lets the provider use its default.
         max_tokens : int, optional
             Maximum number of tokens to generate.
         top_p : float, optional
@@ -225,7 +219,7 @@ class NvidiaClient:
         Returns
         -------
         str
-            The generated text from the model.
+            The generated text from the first choice.
 
         Raises
         ------
@@ -240,15 +234,21 @@ class NvidiaClient:
         """
         _logger.info("Generating completion for model=%s", model)
 
-        payload = NvidiaRequest(
+        # Validate prompt early to give a clear error before network call
+        if not isinstance(prompt, str) or not prompt.strip():
+            raise ValueError("prompt must be a non‑empty string")
+
+        # Build request payload using Pydantic for validation
+        request_payload = NvidiaRequest(
             model=model,
             prompt=prompt,
             temperature=temperature,
             max_tokens=max_tokens,
             top_p=top_p,
         )
-        json_payload = payload.model_dump(exclude_none=True)
+        json_payload = request_payload.model_dump(exclude_none=True)
 
+        # Prepare HTTP client and headers
         headers = {
             "Authorization": f"Bearer {get_nvidia_api_key()}",
             "Content-Type": "application/json",
@@ -258,68 +258,46 @@ class NvidiaClient:
             try:
                 response = await client.post(
                     self.base_url,
-                    headers=headers,
                     json=json_payload,
+                    headers=headers,
                 )
-                _logger.debug(
-                    "Received response: status=%s, body=%s",
-                    response.status_code,
-                    response.text[:200],
+                response.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                status = exc.response.status_code
+                _logger.error(
+                    "HTTP %s error from NVIDIA API: %s", status, exc.response.text
                 )
+                if status in (401, 403):
+                    raise NvidiaAuthenticationError(
+                        f"Authentication failed (status {status})"
+                    ) from exc
+                if status == 429:
+                    raise NvidiaRateLimitError(
+                        "Rate limit exceeded (status 429)"
+                    ) from exc
+                if 500 <= status < 600:
+                    raise NvidiaServerError(
+                        f"Server error (status {status})"
+                    ) from exc
+                raise NvidiaError(
+                    f"Unexpected HTTP error (status {status})"
+                ) from exc
             except httpx.RequestError as exc:
-                _logger.error("Network error while calling NVIDIA API: %s", exc)
+                _logger.exception("Network error while contacting NVIDIA API")
                 raise NvidiaError(f"Network error: {exc}") from exc
 
-        # ------------------------------------------------------------------- #
-        # HTTP status handling
-        # ------------------------------------------------------------------- #
-        if response.status_code == 401 or response.status_code == 403:
-            _logger.warning("Authentication failed (status=%s)", response.status_code)
-            raise NvidiaAuthenticationError("Invalid or missing NVIDIA API key")
-        if response.status_code == 429:
-            _logger.warning("Rate limit exceeded")
-            raise NvidiaRateLimitError("Rate limit exceeded")
-        if 500 <= response.status_code < 600:
-            _logger.error("Server error from NVIDIA (status=%s)", response.status_code)
-            raise NvidiaServerError(
-                f"NVIDIA server error {response.status_code}: {response.text}"
-            )
-        if response.status_code != 200:
-            _logger.error(
-                "Unexpected status code %s from NVIDIA API: %s",
-                response.status_code,
-                response.text,
-            )
-            raise NvidiaError(
-                f"Unexpected status {response.status_code}: {response.text}"
-            )
-
-        # ------------------------------------------------------------------- #
-        # Payload decoding
-        # ------------------------------------------------------------------- #
+        # Parse and validate JSON response
         try:
-            data = response.json()
-            _logger.debug("Decoded JSON payload: %s", json.dumps(data)[:200])
-            nvidia_resp = NvidiaResponse(**data)
-        except (json.JSONDecodeError, ValidationError) as exc:
-            _logger.exception("Failed to parse NVIDIA response")
-            raise NvidiaResponseError(
-                f"Failed to parse response: {exc}"
-            ) from exc
+            payload: Dict[str, Any] = response.json()
+            nvidia_resp = NvidiaResponse.model_validate(payload)
+        except (ValueError, ValidationError) as exc:
+            _logger.exception("Failed to decode or validate NVIDIA response")
+            raise NvidiaResponseError("Invalid response payload") from exc
 
         if not nvidia_resp.choices:
             _logger.error("NVIDIA response contains no choices")
-            raise NvidiaResponseError("No choices returned by NVIDIA API")
+            raise NvidiaResponseError("No completion choices returned")
 
-        generated_text = nvidia_resp.choices[0].text
-        _logger.info("Generated % successfully (tokens=%s)", len(generated_text))
-        return generated_text
-
-
-# --------------------------------------------------------------------------- #
-# Convenience singleton for the rest of the project
-# --------------------------------------------------------------------------- #
-# The project imports ``nvidia_client`` and uses ``nvidia_client.client`` directly.
-# This mirrors the pattern used for the Claude client and guarantees that both
-# clients are instantiated with the same environment configuration.
-client = NvidiaClient()
+        result_text = nvidia_resp.choices[0].text
+        _logger.debug("Generated text: %s", result_text[:100])  # log first 100 chars
+        return result_text

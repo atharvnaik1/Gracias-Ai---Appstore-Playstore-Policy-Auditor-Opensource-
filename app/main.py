@@ -1,124 +1,4 @@
-# app/main.py
-"""
-FastAPI entry point for the LLM micro‑service.
-
-- Reads configuration and secrets from environment variables (or a .env file).
-- Exposes a unified ``/generate`` endpoint that forwards the request to either
-  the NVIDIA or Anthropic (Claude) API based on a ``provider`` flag.
-- Implements basic in‑memory rate‑limiting per client IP.
-- Provides detailed logging, error handling and type‑hints.
-"""
-
-import os
-import logging
-from typing import Literal, Optional, Dict, Any
-
-import httpx
-from fastapi import FastAPI, Request, HTTPException, status, Depends
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, ValidationError
-from dotenv import load_dotenv
-
-# --------------------------------------------------------------------------- #
-# Load environment variables (supports a .env file in the project root)
-# --------------------------------------------------------------------------- #
-load_dotenv()  # noqa: D400
-
-# --------------------------------------------------------------------------- #
-# Logging configuration
-# --------------------------------------------------------------------------- #
-LOG_FORMAT = "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
-logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
-logger = logging.getLogger("llm_service")
-
-# --------------------------------------------------------------------------- #
-# Constants & configuration
-# --------------------------------------------------------------------------- #
-NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
-CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
-if not NVIDIA_API_KEY:
-    logger.warning("NVIDIA_API_KEY not set – NVIDIA provider will be unavailable.")
-if not CLAUDE_API_KEY:
-    logger.warning("CLAUDE_API_KEY not set – Claude provider will be unavailable.")
-
-# --------------------------------------------------------------------------- #
-# Rate limiting (simple token‑bucket implementation)
-# --------------------------------------------------------------------------- #
-RATE_LIMIT = 60  # requests per minute per IP
-_RATE_LIMIT_STATE: Dict[str, Dict[str, Any]] = {}
-
-def _rate_limiter(request: Request) -> None:
-    """Raise HTTPException if the client exceeded the rate limit."""
-    client_ip = request.client.host
-    bucket = _RATE_LIMIT_STATE.setdefault(
-        client_ip,
-        {"tokens": RATE_LIMIT, "last_refill": request.state.time},
-    )
-    # Refill tokens based on elapsed seconds
-    elapsed = request.state.time - bucket["last_refill"]
-    refill = int(elapsed * (RATE_LIMIT / 60))
-    if refill > 0:
-        bucket["tokens"] = min(RATE_LIMIT, bucket["tokens"] + refill)
-        bucket["last_refill"] = request.state.time
-
-    if bucket["tokens"] <= 0:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Rate limit exceeded. Try again later.",
-        )
-    bucket["tokens"] -= 1
-
-# --------------------------------------------------------------------------- #
-# Request / response models
-# --------------------------------------------------------------------------- #
-class GenerateRequest(BaseModel):
-    """Payload for a generation request."""
-    prompt: str = Field(..., min_length=1, description="User prompt")
-    provider: Literal["nvidia", "claude"] | None = Field(
-        None,
-        description="Explicit provider; if omitted the service selects based on availability",
-    )
-    max_tokens: int | None = Field(
-        256,
-        ge=1,
-        le=2048,
-        description="Maximum number of tokens to generate",
-    )
-
-class GenerateResponse(BaseModel):
-    """Standardised response from the LLM service."""
-    provider: Literal["nvidia", "claude"]
-    completion: str
-    usage: Dict[str, Any] | None = None
-
-# --------------------------------------------------------------------------- #
-# Unified client
-# --------------------------------------------------------------------------- #
-class LLMClient:
-    """Thin wrapper that routes calls to the selected LLM provider."""
-
-    def __init__(self) -> None:
-        self._http = httpx.AsyncClient(timeout=30.0)
-
-    async def _call_nvidia(self, prompt: str, max_tokens: int) -> Dict[str, Any]:
-        endpoint = "https://api.nvidia.com/v1/generate"
-        headers = {"Authorization": f"Bearer {NVIDIA_API_KEY}"}
-        payload = {"prompt": prompt, "max_tokens": max_tokens}
-        logger.debug("Calling NVIDIA endpoint %s", endpoint)
-        response = await self._http.post(endpoint, json=payload, headers=headers)
-        response.raise_for_status()
-        return response.json()
-
-    async def _call_claude(self, prompt: str, max_tokens: int) -> Dict[str, Any]:
-        endpoint = "https://api.anthropic.com/v1/complete"
-        headers = {
-            "x-api-key": CLAUDE_API_KEY,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        }
-        payload = {
-            "model": "claude-3-5-sonnet-20240620",
-            "prompt": f"\n\nHuman: {prompt}\n\nAssistant:",
+\nHuman: {prompt}\n\nAssistant:",
             "max_tokens_to_sample": max_tokens,
         }
         logger.debug("Calling Claude endpoint %s", endpoint)
@@ -129,23 +9,31 @@ class LLMClient:
     async def generate(
         self,
         prompt: str,
-        provider: Literal["nvidia", "claude"] | None = None,
+        provider: Optional[Literal["nvidia", "claude"]] = None,
         max_tokens: int = 256,
     ) -> GenerateResponse:
         """
         Generate a completion using the configured provider.
 
-        Args:
-            prompt: Input text for the LLM.
-            provider: Explicit provider name; if ``None`` the client picks the first
-                available provider based on configured API keys.
-            max_tokens: Upper bound for generated tokens.
+        Parameters
+        ----------
+        prompt: str
+            Input text for the LLM.
+        provider: Literal["nvidia", "claude"] | None
+            Explicit provider name; if ``None`` the client picks the first
+            available provider based on configured API keys.
+        max_tokens: int
+            Upper bound for generated tokens.
 
-        Returns:
-            ``GenerateResponse`` containing the provider used and the raw completion.
+        Returns
+        -------
+        GenerateResponse
+            The provider used, the generated text and optional usage data.
 
-        Raises:
-            HTTPException: If no provider is available or the upstream call fails.
+        Raises
+        ------
+        HTTPException
+            If no provider is configured or the upstream call fails.
         """
         # Resolve provider
         if provider is None:
@@ -180,7 +68,10 @@ class LLMClient:
                 usage = {"model": raw.get("model")}
         except httpx.HTTPStatusError as exc:
             logger.error(
-                "Provider %s returned %s – %s", provider, exc.response.status_code, exc
+                "Provider %s returned %s – %s",
+                provider,
+                exc.response.status_code,
+                exc,
             )
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
@@ -195,84 +86,71 @@ class LLMClient:
 
         return GenerateResponse(provider=provider, completion=completion, usage=usage)
 
-# --------------------------------------------------------------------------- #
-# FastAPI application setup
-# --------------------------------------------------------------------------- #
-app = FastAPI(
-    title="LLM Micro‑service",
-    description="Unified wrapper around NVIDIA and Anthropic (Claude) LLM APIs.",
-    version="1.0.0",
-)
-
-client = LLMClient()
 
 # --------------------------------------------------------------------------- #
-# Middleware – inject request timestamp for rate‑limiting
+# Dependency injection
 # --------------------------------------------------------------------------- #
-@app.middleware("http")
-async def add_timestamp(request: Request, call_next):
-    request.state.time = httpx.time.time()
-    return await call_next(request)
-
-# --------------------------------------------------------------------------- #
-# Routes
-# --------------------------------------------------------------------------- #
-@app.get("/health", tags=["Health"])
-async def health() -> JSONResponse:
-    """Simple health‑check endpoint."""
-    return JSONResponse(content={"status": "ok"})
+def get_llm_client(request: Request) -> LLMClient:
+    """Provide a shared LLMClient instance."""
+    return LLMClient(http_client=request.app.state.http_client)  # type: ignore[attr-defined]
 
 
+# --------------------------------------------------------------------------- #
+# API endpoint
+# --------------------------------------------------------------------------- #
 @app.post(
     "/generate",
     response_model=GenerateResponse,
-    tags=["Generation"],
     responses={
-        400: {"description": "Invalid request payload"},
         429: {"description": "Rate limit exceeded"},
-        502: {"description": "Upstream provider error"},
         503: {"description": "No provider configured"},
+        502: {"description": "Upstream service error"},
     },
 )
-async def generate_endpoint(
+async def generate(
     payload: GenerateRequest,
     request: Request,
     _: None = Depends(_rate_limiter),
-) -> GenerateResponse:
+    client: LLMClient = Depends(get_llm_client),
+) -> JSONResponse:
     """
-    Forward a prompt to the selected LLM provider.
+    Generate a completion from the selected LLM provider.
 
-    The endpoint validates the request, applies rate‑limiting,
-    and returns the generated text together with provider metadata.
+    The request is first validated by Pydantic, then the client
+    performs rate‑limiting before delegating to the LLM provider.
     """
     logger.info(
-        "Received generation request – provider=%s, prompt_len=%d",
+        "Received generation request – provider=%s, max_tokens=%s, ip=%s",
         payload.provider or "auto",
-        len(payload.prompt),
+        payload.max_tokens,
+        request.client.host,
     )
-    try:
-        response = await client.generate(
-            prompt=payload.prompt,
-            provider=payload.provider,
-            max_tokens=payload.max_tokens,
-        )
-        logger.info("Generated %d characters using %s", len(response.completion), response.provider)
-        return response
-    except ValidationError as exc:
-        logger.warning("Request validation error – %s", exc)
-        raise HTTPException(status_code=400, detail=exc.errors()) from exc
+    response = await client.generate(
+        prompt=payload.prompt,
+        provider=payload.provider,
+        max_tokens=payload.max_tokens,
+    )
+    logger.info("Generated response using %s", response.provider)
+    return JSONResponse(content=response.dict())
 
 
 # --------------------------------------------------------------------------- #
-# Application entry point (uvicorn)
+# Global exception handlers
 # --------------------------------------------------------------------------- #
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(
-        "app.main:app",
-        host="0.0.0.0",
-        port=int(os.getenv("PORT", "8000")),
-        log_level="info",
-        reload=False,
+@app.exception_handler(ValidationError)
+async def validation_exception_handler(request: Request, exc: ValidationError) -> JSONResponse:
+    """Return a clean JSON error for Pydantic validation failures."""
+    logger.warning("Validation error: %s", exc)
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": exc.errors()},
     )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    """Standardise HTTPException responses."""
+    logger.warning(
+        "HTTPException %s at %s – %s", exc.status_code, request.url.path, exc.detail
+    )
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})

@@ -1,3 +1,4 @@
+python
 # app/api_client/unified_client.py
 """
 Unified LLM API client.
@@ -7,26 +8,27 @@ selected provider (NVIDIA or Anthropic Claude) based on configuration or an
 explicit per‑call flag.
 
 The client reads API keys from environment variables (or a ``.env`` file)
-and raises a :class:`LLMError` for any transport or provider‑specific
-failure.  All network I/O is performed with :mod:`httpx` in async mode.
+and raises :class:`LLMError` for any transport or provider‑specific failure.
+All network I/O is performed with :mod:`httpx` in async mode.
 """
 
 from __future__ import annotations
 
 import os
-import json
 import logging
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 
 import httpx
 from dotenv import load_dotenv
 
-# Load ``.env`` if present – this is a no‑op when the file does not exist.
+# --------------------------------------------------------------------------- #
+# Load environment variables (no‑op if ``.env`` does not exist)
+# --------------------------------------------------------------------------- #
 load_dotenv()
 
 # --------------------------------------------------------------------------- #
-# Logging configuration (the application can re‑configure the root logger)
+# Logging configuration (application may re‑configure the root logger)
 # --------------------------------------------------------------------------- #
 _logger = logging.getLogger(__name__)
 
@@ -36,11 +38,21 @@ _logger = logging.getLogger(__name__)
 class LLMError(RuntimeError):
     """Raised when a request to an LLM provider fails."""
 
-    def __init__(self, provider: str, message: str, status_code: Optional[int] = None):
+    def __init__(
+        self,
+        provider: str,
+        message: str,
+        status_code: Optional[int] = None,
+    ) -> None:
         super().__init__(f"[{provider}] {message}")
         self.provider = provider
         self.status_code = status_code
 
+    def __repr__(self) -> str:  # pragma: no cover
+        return (
+            f"{self.__class__.__name__}(provider={self.provider!r}, "
+            f"message={self.args[0]!r}, status_code={self.status_code!r})"
+        )
 
 # --------------------------------------------------------------------------- #
 # Provider enumeration
@@ -58,7 +70,7 @@ class Provider(str, Enum):
 class _BaseProvider:
     """Base class for concrete LLM providers."""
 
-    def __init__(self, api_key: str, timeout: float = 30.0):
+    def __init__(self, api_key: str, timeout: float = 30.0) -> None:
         if not api_key:
             raise ValueError("API key must be a non‑empty string")
         self._api_key = api_key
@@ -70,8 +82,11 @@ class _BaseProvider:
         raise NotImplementedError
 
     async def _post(self, url: str, json_body: Dict[str, Any]) -> httpx.Response:
-        """Helper to POST JSON payload with appropriate auth header."""
-        headers = {"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"}
+        """POST JSON payload with appropriate auth header."""
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
         try:
             response = await self._client.post(url, headers=headers, json=json_body)
             response.raise_for_status()
@@ -89,8 +104,14 @@ class _BaseProvider:
                 status_code=exc.response.status_code,
             ) from exc
         except httpx.RequestError as exc:
-            _logger.exception("Network error while contacting %s", self.__class__.__name__)
+            _logger.exception(
+                "Network error while contacting %s", self.__class__.__name__
+            )
             raise LLMError(provider=self.__class__.__name__, message=str(exc)) from exc
+
+    async def close(self) -> None:
+        """Close the underlying HTTP client."""
+        await self._client.aclose()
 
 
 # --------------------------------------------------------------------------- #
@@ -102,8 +123,8 @@ class _NvidiaProvider(_BaseProvider):
     _ENDPOINT = "https://api.nvidia.com/v1/ai/generate"
 
     async def generate(self, prompt: str) -> str:
-        payload = {
-            "model": "nvidia/llama-3.1-8b",  # example model; adjust as needed
+        payload: Dict[str, Any] = {
+            "model": "nvidia/llama-3.1-8b",  # adjust as needed
             "prompt": prompt,
             "max_tokens": 512,
             "temperature": 0.7,
@@ -111,7 +132,6 @@ class _NvidiaProvider(_BaseProvider):
         _logger.debug("Sending request to NVIDIA: %s", payload)
         response = await self._post(self._ENDPOINT, payload)
         data = response.json()
-        # NVIDIA's response shape may vary; adapt accordingly.
         try:
             return data["choices"][0]["text"]
         except (KeyError, IndexError) as exc:
@@ -128,8 +148,8 @@ class _ClaudeProvider(_BaseProvider):
     _ENDPOINT = "https://api.anthropic.com/v1/messages"
 
     async def generate(self, prompt: str) -> str:
-        payload = {
-            "model": "claude-3-5-sonnet-20240620",  # example model; adjust as needed
+        payload: Dict[str, Any] = {
+            "model": "claude-3-5-sonnet-20240620",  # adjust as needed
             "max_tokens": 1024,
             "temperature": 0.7,
             "messages": [{"role": "user", "content": prompt}],
@@ -152,9 +172,9 @@ class UnifiedClient:
     Facade exposing a single ``generate`` method.
 
     The client lazily instantiates provider objects based on environment
-    configuration.  Calls can explicitly select a provider via the
-    ``provider`` argument; otherwise the ``DEFAULT_PROVIDER`` environment
-    variable (or ``nvidia`` as a fallback) is used.
+    configuration. Calls can explicitly select a provider via the ``provider``
+    argument; otherwise the ``DEFAULT_PROVIDER`` environment variable (or
+    ``nvidia`` as a fallback) is used.
     """
 
     def __init__(self) -> None:
@@ -166,11 +186,18 @@ class UnifiedClient:
         self._nvidia_client: Optional[_NvidiaProvider] = None
         self._claude_client: Optional[_ClaudeProvider] = None
 
-        # Default provider – fallback to NVIDIA if not set.
-        default = os.getenv("DEFAULT_PROVIDER", Provider.NVIDIA.value).lower()
-        self._default_provider = Provider(default) if default in Provider._value2member_map_ else Provider.NVIDIA
+        # Determine default provider – fallback to NVIDIA if the env var is missing
+        # or contains an unknown value.
+        default_raw = os.getenv("DEFAULT_PROVIDER", Provider.NVIDIA.value).lower()
+        self._default_provider = (
+            Provider(default_raw)
+            if default_raw in Provider._value2member_map_
+            else Provider.NVIDIA
+        )
 
-        _logger.info("UnifiedClient initialised – default provider: %s", self._default_provider)
+        _logger.info(
+            "UnifiedClient initialised – default provider: %s", self._default_provider
+        )
 
     # ------------------------------------------------------------------- #
     # Lazy provider getters
@@ -192,57 +219,67 @@ class UnifiedClient:
     # ------------------------------------------------------------------- #
     # Public API
     # ------------------------------------------------------------------- #
-    async def generate(self, prompt: str, provider: Optional[Provider] = None) -> str:
+    async def generate(
+        self,
+        prompt: str,
+        provider: Optional[Literal["nvidia", "claude"]] = None,
+    ) -> str:
         """
         Generate a completion for *prompt* using the selected provider.
 
         Parameters
         ----------
         prompt:
-            The user‑supplied prompt.
+            The user‑supplied prompt. Must be a non‑empty string.
         provider:
-            Optional explicit provider.  If omitted, the client uses the
-            ``DEFAULT_PROVIDER`` configuration.
+            Optional explicit provider name (``"nvidia"`` or ``"claude"``). If omitted,
+            the client falls back to the default provider resolved at
+            construction time.
 
         Returns
         -------
         str
-            The generated text.
+            The generated completion text.
 
         Raises
         ------
+        ValueError
+            If *prompt* is empty or *provider* is not a recognized value.
         LLMError
-            If the request fails or the provider is mis‑configured.
+            Propagated from the underlying provider when the request fails.
         """
-        if not prompt:
+        if not isinstance(prompt, str) or not prompt.strip():
             raise ValueError("Prompt must be a non‑empty string")
 
-        chosen = provider or self._default_provider
-        _logger.info("Generating text – provider: %s", chosen)
+        # Resolve the provider to use.
+        selected: Provider = (
+            Provider(provider) if provider else self._default_provider
+        )
+        _logger.debug("Generating with provider %s", selected)
 
-        if chosen == Provider.NVIDIA:
+        if selected is Provider.NVIDIA:
             return await self._nvidia.generate(prompt)
-        elif chosen == Provider.CLAUDE:
+        elif selected is Provider.CLAUDE:
             return await self._claude.generate(prompt)
-        else:
-            # This branch should never be hit because Provider is an Enum,
-            # but we keep it for defensive programming.
-            raise LLMError(provider=str(chosen), message="Unsupported provider")
+        else:  # pragma: no cover – defensive programming
+            raise ValueError(f"Unsupported provider: {selected}")
 
-    # ------------------------------------------------------------------- #
-    # Graceful shutdown (useful for FastAPI lifespan events)
-    # ------------------------------------------------------------------- #
     async def close(self) -> None:
-        """Close underlying HTTP clients."""
+        """Close any underlying HTTP connections."""
+        # Close both providers if they have been instantiated.
+        tasks = []
         if self._nvidia_client:
-            await self._nvidia_client._client.aclose()
-            _logger.debug("NVIDIA client closed")
+            tasks.append(self._nvidia_client.close())
         if self._claude_client:
-            await self._claude_client._client.aclose()
-            _logger.debug("Claude client closed")
+            tasks.append(self._claude_client.close())
+        if tasks:
+            await httpx.AsyncClient()._run_tasks(*tasks)  # noqa: SLF001
 
+    # ------------------------------------------------------------------- #
+    # Context‑manager helpers (optional convenience)
+    # ------------------------------------------------------------------- #
+    async def __aenter__(self) -> "UnifiedClient":
+        return self
 
-# --------------------------------------------------------------------------- #
-# Exported symbols
-# --------------------------------------------------------------------------- #
-__all__ = ["UnifiedClient", "Provider", "LLMError"]
+    async def __aexit__(self, exc_type, exc, tb) -> None:  # pragma: no cover
+        await self.close()

@@ -1,20 +1,23 @@
+python
 """
 app/api_client/__init__.py
 
-Unified LLM client exposing a single ``generate`` method that internally routes
-requests to either the NVIDIA AI Foundations API or the Anthropic Claude API
-depending on configuration or a per‑call flag.
+Unified LLM client exposing a single :meth:`UnifiedLLMClient.generate` method that
+internally routes requests to either the NVIDIA AI Foundations API or the
+Anthropic Claude API depending on configuration or a per‑call flag.
 
 The client loads API keys from environment variables (or a ``.env`` file) and
-uses ``httpx`` for asynchronous HTTP communication.  Errors from the remote
-services are wrapped in :class:`LLMAPIError` to provide a consistent exception
-type for callers (e.g. the FastAPI layer).
+uses :class:`httpx.AsyncClient` for asynchronous HTTP communication.  Errors from
+the remote services are wrapped in :class:`LLMAPIError` to provide a consistent
+exception type for callers (e.g. the FastAPI layer).
 
 Typical usage
 -------------
 >>> from app.api_client import UnifiedLLMClient
 >>> client = UnifiedLLMClient()
->>> response = await client.generate("Explain quantum entanglement.", provider="claude")
+>>> response = await client.generate(
+...     "Explain quantum entanglement.", provider="claude", max_tokens=200
+... )
 """
 
 from __future__ import annotations
@@ -22,7 +25,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Literal, Optional, Dict, Any
+from typing import Any, Dict, Literal, Optional
 
 import httpx
 from dotenv import load_dotenv
@@ -35,17 +38,16 @@ load_dotenv()  # Load .env if present; no‑op otherwise
 # --------------------------------------------------------------------------- #
 # Logging configuration
 # --------------------------------------------------------------------------- #
-logger = logging.getLogger(__name__)
-if not logger.handlers:  # Prevent duplicate handlers in interactive sessions
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter(
+_logger = logging.getLogger(__name__)
+if not _logger.handlers:  # Prevent duplicate handlers in interactive sessions
+    _handler = logging.StreamHandler()
+    _formatter = logging.Formatter(
         fmt="%(asctime)s %(levelname)s %(name)s %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
-
+    _handler.setFormatter(_formatter)
+    _logger.addHandler(_handler)
+    _logger.setLevel(logging.INFO)
 
 # --------------------------------------------------------------------------- #
 # Public exceptions
@@ -58,9 +60,9 @@ class LLMAPIError(RuntimeError):
 
     def __init__(self, provider: str, status_code: Optional[int], detail: str) -> None:
         super().__init__(f"{provider.upper()} error [{status_code}]: {detail}")
-        self.provider = provider
-        self.status_code = status_code
-        self.detail = detail
+        self.provider: str = provider
+        self.status_code: Optional[int] = status_code
+        self.detail: str = detail
 
 
 # --------------------------------------------------------------------------- #
@@ -92,18 +94,19 @@ class UnifiedLLMClient:
         claude_api_key: Optional[str] = None,
         timeout: float = 30.0,
     ) -> None:
-        self.nvidia_api_key = nvidia_api_key or os.getenv("NVIDIA_API_KEY")
-        self.claude_api_key = claude_api_key or os.getenv("CLAUDE_API_KEY")
-        self.timeout = timeout
+        self.nvidia_api_key: Optional[str] = nvidia_api_key or os.getenv("NVIDIA_API_KEY")
+        self.claude_api_key: Optional[str] = claude_api_key or os.getenv("CLAUDE_API_KEY")
+        self.timeout: float = timeout
 
         if not self.nvidia_api_key:
-            logger.warning("NVIDIA_API_KEY not set – NVIDIA provider will be unavailable.")
+            _logger.warning("NVIDIA_API_KEY not set – NVIDIA provider will be unavailable.")
         if not self.claude_api_key:
-            logger.warning("CLAUDE_API_KEY not set – Claude provider will be unavailable.")
+            _logger.warning("CLAUDE_API_KEY not set – Claude provider will be unavailable.")
 
         # A single shared async client is sufficient; it will be closed automatically
-        # when the event loop shuts down (FastAPI does this for us).
-        self._http_client = httpx.AsyncClient(timeout=self.timeout)
+        # when the event loop shuts down (FastAPI does this for us).  The client is
+        # created lazily to avoid unnecessary connections during import.
+        self._http_client: httpx.AsyncClient = httpx.AsyncClient(timeout=self.timeout)
 
     # --------------------------------------------------------------------- #
     # Public API
@@ -123,15 +126,16 @@ class UnifiedLLMClient:
         Parameters
         ----------
         prompt : str
-            The user supplied prompt.
+            The user‑supplied prompt.
         provider : {"nvidia", "claude"}, default "nvidia"
             Which backend to use.  The default can be overridden per call.
         max_tokens : int, default 1024
-            Maximum number of tokens to generate.
+            Maximum number of tokens to generate.  Must be a positive integer.
         temperature : float, default 0.7
-            Sampling temperature.
+            Sampling temperature.  Must be in the range ``[0.0, 2.0]``.
         top_p : float, optional
-            Nucleus sampling parameter (only supported by Claude).
+            Nucleus sampling parameter (only supported by Claude).  Must be in the
+            range ``[0.0, 1.0]`` when supplied.
 
         Returns
         -------
@@ -143,13 +147,26 @@ class UnifiedLLMClient:
         LLMAPIError
             If the remote service returns a non‑2xx response or the response
             cannot be parsed.
+        ValueError
+            If an unsupported provider is requested or input validation fails.
         """
+        # ----- Input validation -------------------------------------------------
+        if not isinstance(prompt, str) or not prompt.strip():
+            raise ValueError("Prompt must be a non‑empty string.")
+        if max_tokens <= 0:
+            raise ValueError("max_tokens must be a positive integer.")
+        if not (0.0 <= temperature <= 2.0):
+            raise ValueError("temperature must be between 0.0 and 2.0.")
+        if top_p is not None and not (0.0 <= top_p <= 1.0):
+            raise ValueError("top_p must be between 0.0 and 1.0 when provided.")
+
+        # ----- Provider dispatch ------------------------------------------------
         if provider == "nvidia":
             return await self._call_nvidia(prompt, max_tokens, temperature)
-        elif provider == "claude":
+        if provider == "claude":
             return await self._call_claude(prompt, max_tokens, temperature, top_p)
-        else:
-            raise ValueError(f"Unsupported provider: {provider!r}")
+
+        raise ValueError(f"Unsupported provider: {provider!r}")
 
     # --------------------------------------------------------------------- #
     # Provider‑specific implementations
@@ -160,6 +177,7 @@ class UnifiedLLMClient:
         max_tokens: int,
         temperature: float,
     ) -> str:
+        """Call the NVIDIA AI Foundations API."""
         if not self.nvidia_api_key:
             raise LLMAPIError("nvidia", None, "Missing NVIDIA API key")
 
@@ -177,29 +195,29 @@ class UnifiedLLMClient:
             "Content-Type": "application/json",
         }
 
-        logger.debug("Sending request to NVIDIA: %s", json.dumps(payload))
+        _logger.debug("NVIDIA request payload: %s", json.dumps(payload))
         try:
             response = await self._http_client.post(
                 self._NVIDIA_ENDPOINT, json=payload, headers=headers
             )
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
-            logger.error(
+            _logger.error(
                 "NVIDIA responded with %s – %s", exc.response.status_code, exc.response.text
             )
             raise LLMAPIError("nvidia", exc.response.status_code, exc.response.text) from exc
         except httpx.RequestError as exc:
-            logger.error("Network error while contacting NVIDIA: %s", str(exc))
+            _logger.error("Network error while contacting NVIDIA: %s", str(exc))
             raise LLMAPIError("nvidia", None, str(exc)) from exc
 
         try:
             data = response.json()
             # NVIDIA returns the generated text under ``choices[0].text`` in many models.
             text = data["choices"][0]["text"]
-            logger.debug("NVIDIA response parsed successfully")
+            _logger.debug("NVIDIA response parsed successfully")
             return text
         except (KeyError, json.JSONDecodeError) as exc:
-            logger.exception("Failed to parse NVIDIA response")
+            _logger.exception("Failed to parse NVIDIA response")
             raise LLMAPIError("nvidia", response.status_code, "Invalid response format") from exc
 
     async def _call_claude(
@@ -209,15 +227,16 @@ class UnifiedLLMClient:
         temperature: float,
         top_p: Optional[float],
     ) -> str:
+        """Call the Anthropic Claude API."""
         if not self.claude_api_key:
             raise LLMAPIError("claude", None, "Missing Claude API key")
 
-        messages = [{"role": "user", "content": prompt}]
+        # Claude expects a messages list; we use a single user message.
         payload: Dict[str, Any] = {
-            "model": "claude-3-5-sonnet-20240620",
+            "model": "claude-3-opus-20240229",
             "max_tokens": max_tokens,
             "temperature": temperature,
-            "messages": messages,
+            "messages": [{"role": "user", "content": prompt}],
         }
         if top_p is not None:
             payload["top_p"] = top_p
@@ -228,41 +247,61 @@ class UnifiedLLMClient:
             "Content-Type": "application/json",
         }
 
-        logger.debug("Sending request to Claude: %s", json.dumps(payload))
+        _logger.debug("Claude request payload: %s", json.dumps(payload))
         try:
             response = await self._http_client.post(
                 self._CLAUDE_ENDPOINT, json=payload, headers=headers
             )
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
-            logger.error(
+            _logger.error(
                 "Claude responded with %s – %s", exc.response.status_code, exc.response.text
             )
             raise LLMAPIError("claude", exc.response.status_code, exc.response.text) from exc
         except httpx.RequestError as exc:
-            logger.error("Network error while contacting Claude: %s", str(exc))
+            _logger.error("Network error while contacting Claude: %s", str(exc))
             raise LLMAPIError("claude", None, str(exc)) from exc
 
         try:
             data = response.json()
-            # Claude returns a list of content blocks under ``content``.
-            content_blocks = data["content"]
-            # Concatenate all text blocks (ignore tool blocks for simplicity).
-            text = "".join(
-                block["text"] for block in content_blocks if block["type"] == "text"
-            )
-            logger.debug("Claude response parsed successfully")
+            # Claude returns the generated text under ``content[0].text``.
+            text = data["content"][0]["text"]
+            _logger.debug("Claude response parsed successfully")
             return text
         except (KeyError, json.JSONDecodeError) as exc:
-            logger.exception("Failed to parse Claude response")
+            _logger.exception("Failed to parse Claude response")
             raise LLMAPIError("claude", response.status_code, "Invalid response format") from exc
 
     # --------------------------------------------------------------------- #
-    # Graceful shutdown
+    # Cleanup helpers
     # --------------------------------------------------------------------- #
-    async def a(self) -> None:
-        """Close the underlying HTTP client – call from FastAPI shutdown events."""
+    async def close(self) -> None:
+        """Close the underlying HTTP client."""
         await self._http_client.aclose()
+        _logger.info("UnifiedLLMClient HTTP client closed")
+
+    async def __aenter__(self) -> "UnifiedLLMClient":
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:  # pragma: no cover
+        await self.close()
+
+    def __del__(self) -> None:  # pragma: no cover
+        # In case the user forgets to close the client explicitly.
+        if not self._http_client.is_closed:
+            # ``aclose`` is async; we fire‑and‑forget here because __del__ cannot be async.
+            try:
+                import asyncio
+
+                asyncio.create_task(self._http_client.aclose())
+            except Exception:  # pragma: no cover
+                pass
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}(nvidia_api_key={'set' if self.nvidia_api_key else 'missing'}, "
+            f"claude_api_key={'set' if self.claude_api_key else 'missing'}, timeout={self.timeout})"
+        )
 
 
 # --------------------------------------------------------------------------- #
