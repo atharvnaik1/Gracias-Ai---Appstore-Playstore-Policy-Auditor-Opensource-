@@ -83,6 +83,39 @@ def display_vercel_authorization_steps() -> None:
     print(get_vercel_authorization_instructions())
 
 # --------------------------------------------------------------------------- #
+# Deploy to Vercel Section
+# --------------------------------------------------------------------------- #
+def get_deploy_to_vercel_instructions() -> str:
+    """Return step‑by‑step instructions for deploying to Vercel."""
+    steps = [
+        "Deploy to Vercel",
+        "-----------------",
+        "1. Authorize the deployment for the **atharvnaik1's projects** team:",
+        f"   https://vercel.com/git/authorize?team=atharvnaik1%20projects&slug=atharvnaik1s-projects&teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&type=github",
+        "2. Ensure the following environment variables are set:",
+        "   - VERCEL_ORG_ID=team_c0hqDrZckNBm5AkYTYHVKoE8",
+        "   - VERCEL_PROJECT_ID=proj_XXXXXXXXXXXX",
+        "   - VERCEL_TOKEN=your_vercel_token",
+        "3. Log in to Vercel CLI:",
+        "   $ vercel login",
+        "4. Link the local project to the Vercel project:",
+        "   $ vercel link --project $VERCEL_PROJECT_ID --org $VERCEL_ORG_ID",
+        "5. Add any required environment variables to Vercel:",
+        "   $ vercel env add <NAME> <VALUE> --prod   # repeat for each env var",
+        "6. Deploy the project:",
+        "   $ vercel deploy --prod",
+        "",
+        "After a successful deployment, Vercel will provide a URL where the service
+        can be accessed."
+    ]
+    return "\n".join(steps)
+
+def display_deploy_to_vercel_instructions() -> None:
+    """Print Vercel deployment instructions to the console."""
+    LOGGER.info("Vercel Deployment Instructions:")
+    print(get_deploy_to_vercel_instructions())
+
+# --------------------------------------------------------------------------- #
 # Logging configuration
 # --------------------------------------------------------------------------- #
 logging.basicConfig(
@@ -208,31 +241,33 @@ def install_dependencies(venv_path: Path, requirements_file: Path) -> None:
 
 
 def main(repo_url: str, base_dir: Path) -> None:
-    """Orchestrate the full setup process.
-
-    Args:
-        repo_url: HTTPS URL of the Git repository.
-        base_dir: Base directory where the project will be set up.
-    """
-    # Display Vercel authorization steps before proceeding
-    display_vercel_authorization_steps()
-
+    # Example usage flow (can be expanded as needed):
     repo_dir = base_dir / "repo"
     venv_path = base_dir / ".venv"
     requirements_file = repo_dir / "requirements.txt"
 
+    # Step 1: Clone the repository
     clone_repository(repo_url, repo_dir)
+
+    # Step 2: Create a virtual environment
     create_virtual_environment(venv_path)
+
+    # Step 3: Install dependencies
     install_dependencies(venv_path, requirements_file)
 
-    LOGGER.info("Setup completed successfully.")
+    # Step 4: Show Vercel authorization steps
+    display_vercel_authorization_steps()
+
+    # Step 5: Show Vercel deployment steps
+    display_deploy_to_vercel_instructions()
 
 
 if __name__ == "__main__":
+    # Simple CLI handling (can be replaced with argparse for more robustness)
     if len(sys.argv) != 3:
-        LOGGER.error("Usage: python setup.py <repo_url> <base_dir>")
+        LOGGER.error("Usage: %s <repo_url> <base_dir>", sys.argv[0])
         sys.exit(1)
 
     repo_url_arg = sys.argv[1]
-    base_dir_arg = Path(sys.argv[2]).expanduser().resolve()
+    base_dir_arg = Path(sys.argv[2]).resolve()
     main(repo_url_arg, base_dir_arg)

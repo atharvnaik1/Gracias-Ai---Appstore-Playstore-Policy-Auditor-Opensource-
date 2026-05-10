@@ -3,6 +3,9 @@ json
   "projectId": "atharvnaik1s-projects",
   "teamId": "team_c0hqDrZckNBm5AkYTYHVKoE8",
   "slug": "ipaship-app-reviewer",
+  "gitRepository": {
+    "slug": "atharvnaik1s-projects"
+  },
   "build": {
     "src": "src/index.js",
     "use": "@vercel/node"
