@@ -45,9 +45,9 @@ const providerModels: Record<string, { label: string; value: string }[]> = {
     { label: 'Mixtral 8x22B', value: 'mistralai/mixtral-8x22b-instruct' },
   ],
   ipaship: [
-    { label: 'GLM 5.1', value: 'glm-5.1' },
     { label: 'ipaShip AI Core', value: 'meta/llama-3.1-405b-instruct' },
     { label: 'ipaShip AI Fast', value: 'meta/llama-3.1-70b-instruct' },
+    { label: 'GLM 5.1', value: 'glm-5.1' },
   ],
 };
 
@@ -61,7 +61,8 @@ const selectStyle = {
 export default function AuditPage() {
   const [file, setFile] = useState<File | null>(null);
   const [provider, setProvider] = useState('ipaship');
-  const [model, setModel] = useState('glm-5.1');
+  const [model, setModel] = useState('meta/llama-3.1-405b-instruct');
+  const [apiKey, setApiKey] = useState('');
   const [context, setContext] = useState('');
   const [phase, setPhase] = useState<AuditPhase>('idle');
   const [reportContent, setReportContent] = useState('');
@@ -268,6 +269,7 @@ export default function AuditPage() {
         formData.append('fileName', file.name);
         formData.append('provider', provider);
         formData.append('model', model);
+        formData.append('apiKey', apiKey);
         formData.append('context', context);
         response = await fetch('/api/audit', { method: 'POST', body: formData });
       } else {
@@ -277,6 +279,7 @@ export default function AuditPage() {
         formData.append('file', file);
         formData.append('provider', provider);
         formData.append('model', model);
+        formData.append('apiKey', apiKey);
         formData.append('context', context);
         response = await fetch('/api/audit', { method: 'POST', body: formData });
         setPhase('analyzing');
@@ -865,6 +868,21 @@ export default function AuditPage() {
                       </div>
 
                       {/* API Key */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Key className="w-3.5 h-3.5 text-green-400" />
+                          <span className="text-xs font-semibold text-white">API Key <span className="text-muted-foreground font-normal">(optional if configured on server)</span></span>
+                        </div>
+                        <input
+                          type="password"
+                          value={apiKey}
+                          onChange={(e) => setApiKey(e.target.value)}
+                          placeholder={provider === 'ipaship' ? 'NVIDIA API key' : `${provider} API key`}
+                          autoComplete="off"
+                          spellCheck={false}
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-green-400/50 focus:ring-1 focus:ring-green-400/50 transition-all"
+                        />
+                      </div>
 
                       {/* Context */}
                       <div className="flex-1 flex flex-col space-y-2">
@@ -1002,7 +1020,7 @@ export default function AuditPage() {
                       step: '02',
                       color: 'from-blue-500 to-cyan-500',
                       title: 'AI Analyzes Your Code',
-                      desc: 'Your code is sent directly to your chosen AI provider using your API key. We act as a secure passthrough, nothing stored.',
+                      desc: 'Your code is sent through a temporary audit request to your chosen AI provider using your API key. We do not store the key.',
                       icon: <Cpu className="w-5 h-5" />,
                     },
                     {
@@ -1056,7 +1074,7 @@ export default function AuditPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         {[
                           { title: 'No Cloud Storage', desc: 'Files are processed in ephemeral temp directories and deleted immediately after audit.' },
-                          { title: 'Bring Your Own Key', desc: 'Your API key goes directly to your AI provider. We never store or log it.' },
+                          { title: 'Bring Your Own Key', desc: 'Your API key is used only for the audit request and is never stored or logged.' },
                           { title: 'Fully Auditable', desc: 'Read every line of our open-source code on GitHub. Full transparency.' },
                         ].map((item) => (
                           <div key={item.title} className="flex gap-3">

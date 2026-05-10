@@ -50,6 +50,64 @@ const SKIP_DIRS = new Set([
 const MAX_FILE_SIZE = 50_000; // 50KB per individual source file
 const MAX_TOTAL_CONTENT = 350_000; // 350KB total context (roughly ~90k tokens max)
 
+function sanitizeUploadFileName(fileName: string): string {
+  const baseName = path.basename((fileName || 'upload.ipa').replace(/\\/g, '/'));
+  return baseName.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_') || 'upload.ipa';
+}
+
+function sanitizeUploadFileId(fileId: string): string {
+  if (!/^gracias-upload-[A-Za-z0-9_-]+$/.test(fileId)) {
+    throw new Error('Invalid uploaded file reference');
+  }
+  return fileId;
+}
+
+function hasUnsafeZipEntry(entryName: string): boolean {
+  const normalized = entryName.replace(/\\/g, '/');
+  return (
+    path.isAbsolute(entryName) ||
+    normalized.startsWith('/') ||
+    /^[A-Za-z]:\//.test(normalized) ||
+    normalized.split('/').some(part => part === '..')
+  );
+}
+
+async function assertSafeArchiveEntries(filePath: string) {
+  const { stdout } = await execFileAsync('unzip', ['-Z1', filePath], {
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  const entries = stdout.split(/\r?\n/).filter(Boolean);
+  const unsafeEntry = entries.find(hasUnsafeZipEntry);
+  if (unsafeEntry) {
+    throw new Error(`Archive contains unsafe path: ${unsafeEntry}`);
+  }
+}
+
+function getProviderEnvApiKey(provider: string): string {
+  const providerKeys: Record<string, string | undefined> = {
+    anthropic: process.env.ANTHROPIC_API_KEY,
+    openai: process.env.OPENAI_API_KEY,
+    gemini: process.env.GEMINI_API_KEY,
+    openrouter: process.env.OPENROUTER_API_KEY,
+    ipaship: process.env.NVIDIA_API_KEY || process.env.NVIDIA_KEY || process.env.NEXT_PUBLIC_API_KEY,
+  };
+  return providerKeys[provider] || '';
+}
+
+function extractTextFragment(parsed: any): string {
+  if (typeof parsed?.delta?.text === 'string') return parsed.delta.text;
+  if (typeof parsed?.choices?.[0]?.delta?.content === 'string') {
+    return parsed.choices[0].delta.content;
+  }
+  const geminiParts = parsed?.candidates?.[0]?.content?.parts;
+  if (Array.isArray(geminiParts)) {
+    return geminiParts
+      .map((part: any) => typeof part?.text === 'string' ? part.text : '')
+      .join('');
+  }
+  return '';
+}
+
 function getClientKey(req: NextRequest): string {
   const forwarded = req.headers.get('x-forwarded-for');
   if (forwarded) {
@@ -128,7 +186,7 @@ function parseMultipartStream(
         return;
       }
 
-      fileName = info.filename || 'upload.ipa';
+      fileName = sanitizeUploadFileName(info.filename || 'upload.ipa');
       filePath = path.join(tempDir, fileName);
       fileReceived = true;
 
@@ -170,7 +228,7 @@ function parseMultipartStream(
       if (fieldname === 'model') model = val;
       if (fieldname === 'context') context = val;
       if (fieldname === 'fileId') fileId = val;
-      if (fieldname === 'fileName') fileName = val;
+      if (fieldname === 'fileName') fileName = sanitizeUploadFileName(val);
     });
 
     busboy.on('finish', () => {
@@ -179,9 +237,14 @@ function parseMultipartStream(
         return;
       }
       if (!fileReceived && fileId) {
-        filePath = path.join(os.tmpdir(), fileId, fileName);
-        fileReceived = true;
-        writeFinished = true;
+        try {
+          filePath = path.join(os.tmpdir(), sanitizeUploadFileId(fileId), sanitizeUploadFileName(fileName));
+          fileReceived = true;
+          writeFinished = true;
+        } catch (error) {
+          safeReject(error);
+          return;
+        }
       }
       busboyFinished = true;
       if (!filePath) {
@@ -453,23 +516,28 @@ export async function POST(req: NextRequest) {
 
     // Stream-parse the multipart upload — writes file directly to disk
     // without ever loading the full file into memory
-    const { filePath, fileName, provider, model, context } = await parseMultipartStream(req, tempDir);
-    const resolvedApiKey = process.env.NVIDIA_KEY || process.env.NEXT_PUBLIC_API_KEY || '';
-
-    if (!resolvedApiKey || !resolvedApiKey.trim()) {
-      return NextResponse.json({ error: 'API key is required in environment variables' }, { status: 500 });
-    }
-
     // Only accept .ipa, .apk, .zip files
+    const { filePath, fileName, apiKey, provider, model, context } = await parseMultipartStream(req, tempDir);
     const ext = path.extname(fileName).toLowerCase();
     if (ext !== '.ipa' && ext !== '.apk' && ext !== '.zip') {
       return NextResponse.json({ error: 'Only .ipa, .apk, or .zip files are accepted.' }, { status: 400 });
+    }
+
+    const VALID_PROVIDERS = new Set(['ipaship', 'anthropic', 'openai', 'gemini', 'openrouter']);
+    if (!VALID_PROVIDERS.has(provider)) {
+      return NextResponse.json({ error: `Invalid provider: ${provider}` }, { status: 400 });
+    }
+
+    const resolvedApiKey = apiKey.trim() || getProviderEnvApiKey(provider).trim();
+    if (!resolvedApiKey) {
+      return NextResponse.json({ error: `API key is required for ${provider}.` }, { status: 400 });
     }
 
     const extractDir = path.join(tempDir, 'extracted');
     await fs.mkdir(extractDir, { recursive: true });
     try {
       // NOTE: This depends on system-level 'unzip' which may fail on Windows. Suggest using a cross-platform library like adm-zip or unzipper.
+      await assertSafeArchiveEntries(filePath);
       await execFileAsync('unzip', ['-o', '-q', filePath, '-d', extractDir], {
         maxBuffer: 50 * 1024 * 1024,
       });
@@ -491,11 +559,6 @@ export async function POST(req: NextRequest) {
     let apiUrl = '';
     let headers: Record<string, string> = { 'Content-Type': 'application/json' };
     let payload: any = {};
-
-    const VALID_PROVIDERS = new Set(['ipaship', 'anthropic', 'openai', 'gemini', 'openrouter']);
-    if (!VALID_PROVIDERS.has(provider)) {
-      return NextResponse.json({ error: `Invalid provider: ${provider}` }, { status: 400 });
-    }
 
     // AbortController to cancel AI request if client disconnects
     const abortController = new AbortController();
@@ -567,6 +630,7 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
+      signal: abortController.signal,
     });
 
     if (!response.ok) {
@@ -597,7 +661,7 @@ export async function POST(req: NextRequest) {
                 if (data === '[DONE]') continue;
                 try {
                   const parsed = JSON.parse(data);
-                  const textFragment = parsed.delta?.text || '';
+                  const textFragment = extractTextFragment(parsed);
                   if (textFragment) {
                     controller.enqueue(encoder.encode(JSON.stringify({ type: 'content', text: textFragment }) + '\n'));
                   }
