@@ -51,9 +51,13 @@ cd ipaShip-Ai---Appstore-Playstore-Policy-Auditor-Opensource-
 npm install
 
 # Create environment file
-echo 'MONGODB_URI=your_mongodb_uri_here' > .env.local
+cp .env.example .env
+# Edit .env with your actual API keys
 
-# Start dev server
+# Validate environment and start (RECOMMENDED)
+npm run start:safe
+
+# Or start without validation
 npm run dev
 ```
 

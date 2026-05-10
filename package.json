@@ -8,7 +8,11 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start -H 0.0.0.0 -p 8080"
+    "start": "next start -H 0.0.0.0 -p 8080",
+    "validate-env": "node scripts/validate-env.js",
+    "predev": "npm run validate-env",
+    "prebuild": "npm run validate-env",
+    "start:safe": "node scripts/start-with-checks.js"
   },
   "keywords": [],
   "author": "",
@@ -35,6 +39,7 @@
     "@types/node": "^25.5.0",
     "@types/react": "^19.2.14",
     "autoprefixer": "^10.4.27",
+    "dotenv": "^16.4.5",
     "postcss": "^8.5.8",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.9.3"
