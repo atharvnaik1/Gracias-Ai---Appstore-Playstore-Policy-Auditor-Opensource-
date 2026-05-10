@@ -3,9 +3,10 @@ import { NextResponse } from 'next/server';
 import { MongoClient } from 'mongodb';
 
 const MONGODB_URI = process.env.MONGODB_URI;
+const APP_VERSION = process.env.APP_VERSION || '1.0.0';
 let client;
 
-export async function GET() {
+export async function GET(request) {
   try {
     // Initialize and connect the MongoDB client if not already connected
     if (!client) {
@@ -22,8 +23,16 @@ export async function GET() {
       );
     }
 
-    // Return health status
-    return NextResponse.json({ status: 'ok' }, { status: 200 });
+    // Set Cache-Control header
+    const headers = new Headers({
+      'Cache-Control': 'no-store, max-age=0',
+    });
+
+    // Return health status with version
+    return NextResponse.json(
+      { status: 'OK', version: APP_VERSION },
+      { status: 200, headers }
+    );
   } catch (error) {
     return NextResponse.json(
       { status: 'error', message: error.message },

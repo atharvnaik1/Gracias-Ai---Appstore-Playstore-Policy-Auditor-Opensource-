@@ -13,12 +13,15 @@ python
 #    https://vercel.com/git/authorize?team=atharvnaik1%27s%20projects&slug=atharvnaik1s-projects&teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&type=github&job=%7B%22headInfo%22%3A%7B%22sha%22%3A%225404aa6b82d178cb7f53c8bb6d252962038819d1%22%7D%2C%22id%22%3A%22Qmema1agMRtSB3nfshejPmmAWBrYNK6zKicZTJuG9QTP1e%22%2C%22org%22%3A%22atharvnaik1%22%2C%22prId%22%3A103%2C%22repo%22%3A%22ipaship-app-reviewer%22%7D
 #
 # 2. Required Environment Variables
+#    - MONGODB_URI: MongoDB connection string
+#    - GITHUB_TOKEN: Personal access token for GitHub API access
+#    - API_KEY: Generic API key used by the application
 #    - VERCEL_TEAM_ID: The Vercel team identifier (e.g., team_c0hqDrZckNBm5AkYTYHVKoE8)
 #    - VERCEL_PROJECT_ID: The Vercel project identifier (optional, if using the Vercel CLI)
 #    - DOCKER_IMAGE: Name of the Docker image to build/push (e.g., ghcr.io/yourorg/yourapp)
 #    - DOCKER_REGISTRY: Docker registry URL (e.g., ghcr.io)
-#    - Additional project‑specific variables (API keys, endpoints, etc.) must be set
-#      in a .env file or the deployment environment.
+#    - Additional project‑specific variables (e.g., NVIDIA_API_KEY, CLAUDE_API_KEY)
+#      must be set in a .env file or the deployment environment.
 #
 # 3. Deployment Steps
 #    a. Ensure the repository is authorized (step 1).
@@ -121,7 +124,19 @@ class Settings(BaseSettings):
     docker_image: Optional[str] = Field(None, env="DOCKER_IMAGE")
     docker_registry: Optional[str] = Field(None, env="DOCKER_REGISTRY")
 
-    @validator("nvidia_api_key", "claude_api_key", "vercel_team_id")
+    # Additional required environment variables
+    mongodb_uri: str = Field(..., env="MONGODB_URI")
+    github_token: str = Field(..., env="GITHUB_TOKEN")
+    api_key: str = Field(..., env="API_KEY")
+
+    @validator(
+        "nvidia_api_key",
+        "claude_api_key",
+        "vercel_team_id",
+        "mongodb_uri",
+        "github_token",
+        "api_key",
+    )
     def not_empty(cls, v: str) -> str:
         if not v.strip():
             raise ValueError("Value cannot be empty")

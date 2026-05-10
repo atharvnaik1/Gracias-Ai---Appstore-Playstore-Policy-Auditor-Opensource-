@@ -287,81 +287,49 @@ async function collectFiles(dir: string, basePath: string = ''): Promise<SourceF
 
 // ────────────────────── API Handler ───────────────────────────────────────
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const clientKey = getClientKey(req);
-  const now = Date.now();
-
-  // Simple rate‑limit check
-  const recent = rateLimitCache.get(clientKey) ?? 0;
-  if (now - recent < 1000) {
-    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
-  }
-  rateLimitCache.set(clientKey, now);
-
-  // Validate payload type
-  if (!req.body) {
-    return NextResponse.json({ error: 'Missing request body' }, { status: 400 });
+  // ---- API‑key validation ----
+  const apiKeyHeader = req.headers.get('x-api-key');
+  const expectedKey = process.env.API_KEY; // set this env var in Vercel dashboard
+  if (!apiKeyHeader || apiKeyHeader !== expectedKey) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'audit-'));
-
-  let upload: ParsedUpload;
   try {
-    upload = await parseMultipartStream(req, tempDir);
-  } catch (err: any) {
-    // Authentication error handling
-    if (err.message?.includes('apiKey')) {
-      return NextResponse.json({ error: 'Missing or invalid API key' }, { status: 401 });
+    // Create a temporary directory for the upload
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'upload-'));
+
+    // Parse multipart form data
+    const upload = await parseMultipartStream(req, tempDir);
+
+    // ---- Rate‑limit check (optional) ----
+    const clientKey = getClientKey(req);
+    const currentCount = rateLimitCache.get(clientKey) ?? 0;
+    if (currentCount > 10) {
+      return NextResponse.json({ error: 'Too Many Requests' }, { status: 429 });
     }
-    // Bad request for parsing errors
-    return NextResponse.json({ error: err.message ?? 'Invalid request' }, { status: 400 });
-  }
+    rateLimitCache.set(clientKey, currentCount + 1);
 
-  // Authentication validation
-  if (!upload.apiKey) {
-    return NextResponse.json({ error: 'Missing API key' }, { status: 401 });
-  }
+    // ---- Process the uploaded file ----
+    // (Placeholder – replace with actual processing logic)
+    const files = await collectFiles(tempDir);
+    const context = await buildRetrievedContext(files);
 
-  // Basic payload validation
-  if (!upload.provider || !upload.model) {
-    return NextResponse.json(
-      { error: 'Missing required fields: provider and/or model' },
-      { status: 400 }
-    );
-  }
+    // Clean up temporary directory
+    await fs.rmdir(tempDir, { recursive: true });
 
-  try {
-    // Collect source files from the uploaded archive (assume it's a zip or directory)
-    const sourceFiles = await collectFiles(upload.filePath);
-    const context = await buildRetrievedContext(sourceFiles, upload.context);
-
-    // Example: run an external analysis tool (e.g., Claude) – placeholder
-    const analysisResult = await execFileAsync('some-analyzer', [
-      '--provider',
-      upload.provider,
-      '--model',
-      upload.model,
-      '--context',
-      context,
-    ]);
-
-    // Clean up temporary files
-    await fs.rm(tempDir, { recursive: true, force: true });
-
+    // ---- Successful response ----
     return NextResponse.json(
       {
-        success: true,
-        result: analysisResult.stdout,
+        message: 'File processed successfully',
+        fileId: upload.fileId ?? null,
         context,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (err: any) {
-    // Clean up on error as well
-    await fs.rm(tempDir, { recursive: true, force: true });
-    console.error('Processing error:', err);
-    return NextResponse.json(
-      { error: err.message ?? 'Internal server error' },
-      { status: 500 }
-    );
+    // ---- Consistent error handling ----
+    const status = err?.status ?? 400;
+    const message = err?.message ?? 'Bad Request';
+    return NextResponse.json({ error: message }, { status });
   }
 }

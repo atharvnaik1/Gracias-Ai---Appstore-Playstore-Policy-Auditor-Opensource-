@@ -1,9 +1,17 @@
+python
 import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs, createWriteStream } from 'fs';
 import path from 'path';
 import os from 'os';
 import { Readable } from 'stream';
 import Busboy from 'busboy';
+
+// Disable Next.js default body parser for multipart/form‑data
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -13,12 +21,13 @@ const UPLOAD_TEMP_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 export async function POST(req: NextRequest) {
   let tempDir: string | null = null;
-  
+
   try {
+    // Create a temporary directory (under /tmp)
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gracias-upload-'));
-    
+
     const contentType = req.headers.get('content-type') || '';
-    
+
     // Convert Web ReadableStream to Node.js Readable
     const reader = req.body!.getReader();
     const nodeStream = new Readable({
@@ -36,7 +45,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const parsed = await new Promise((resolve, reject) => {
+    const parsed = await new Promise<{ fileName: string; filePath: string }>((resolve, reject) => {
       const busboy = Busboy({
         headers: { 'content-type': contentType },
         limits: { fileSize: MAX_UPLOAD_SIZE, files: 1 },
@@ -51,7 +60,7 @@ export async function POST(req: NextRequest) {
 
       const tryResolve = () => {
         if (busboyFinished && writeFinished && !rejected) {
-          resolve({ fileName, fileId: path.basename(tempDir!) });
+          resolve({ fileName, filePath });
         }
       };
 
@@ -68,12 +77,11 @@ export async function POST(req: NextRequest) {
           return;
         }
 
-        fileName = info.filename || 'upload.ipa';
+        fileName = info.filename || 'upload.bin';
         filePath = path.join(tempDir!, fileName);
         fileReceived = true;
 
         const writeStream = createWriteStream(filePath);
-
         (fileStream as NodeJS.ReadableStream).pipe(writeStream);
 
         writeStream.on('finish', () => {
@@ -81,13 +89,8 @@ export async function POST(req: NextRequest) {
           tryResolve();
         });
 
-        writeStream.on('error', (err) => {
-          safeReject(err);
-        });
-
-        (fileStream as any).on('limit', () => {
-          safeReject(new Error('File exceeds maximum size'));
-        });
+        writeStream.on('error', safeReject);
+        (fileStream as any).on('limit', () => safeReject(new Error('File exceeds maximum size')));
       });
 
       busboy.on('finish', () => {
@@ -100,17 +103,27 @@ export async function POST(req: NextRequest) {
       });
 
       busboy.on('error', safeReject);
-
       nodeStream.pipe(busboy);
     });
 
-    const uploadDir = tempDir;
+    // Get file size
+    const stats = await fs.stat(parsed.filePath);
+    const fileSize = stats.size;
+
+    // Build a simple file URL (local temporary path)
+    const fileUrl = `file://${parsed.filePath}`;
+
+    // Schedule cleanup of the temporary directory
     const cleanupTimer = setTimeout(() => {
-      fs.rm(uploadDir, { recursive: true, force: true }).catch(() => {});
+      fs.rm(tempDir!, { recursive: true, force: true }).catch(() => {});
     }, UPLOAD_TEMP_TTL_MS);
     cleanupTimer.unref?.();
 
-    return NextResponse.json(parsed);
+    // Return JSON payload with URL and size
+    return NextResponse.json({
+      fileUrl,
+      size: fileSize,
+    });
   } catch (error: any) {
     console.error('Upload Error:', error);
     if (tempDir) {

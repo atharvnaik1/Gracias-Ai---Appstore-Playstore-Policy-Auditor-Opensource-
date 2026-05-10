@@ -8,6 +8,16 @@ json
     "use": "@vercel/next"
   },
   "outputDirectory": "out",
+  "functions": {
+    "api/**/*.js": {
+      "runtime": "nodejs18.x"
+    },
+    "app/api/**/*.js": {
+      "runtime": "nodejs18.x"
+    }
+  },
+  "cleanUrls": true,
+  "trailingSlash": false,
   "routes": [
     {
       "src": "/(.*)",

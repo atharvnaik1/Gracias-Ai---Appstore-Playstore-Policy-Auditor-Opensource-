@@ -6,12 +6,13 @@ Integration tests for the unified LLM service.
 The tests spin up mock HTTP endpoints for the two supported providers
 (NVIDIA and Anthropic Claude) and verify that the service correctly
 routes requests, handles API keys, and returns the expected
-completion payloads.
+completion payloads. They also verify health and upload endpoints.
 """
 
 import os
 import json
 import logging
+import time
 from typing import Dict, List
 
 import pytest
@@ -81,6 +82,11 @@ def _mock_health_endpoint() -> Dict:
     return {"status": "ok"}
 
 
+def _mock_upload_endpoint() -> Dict:
+    """Mock upload endpoint payload."""
+    return {"status": "uploaded", "message": "File uploaded successfully"}
+
+
 # --------------------------------------------------------------------------- #
 # Fixtures
 # --------------------------------------------------------------------------- #
@@ -93,12 +99,25 @@ def set_api_and_vercel_keys(monkeypatch):
     # API keys for providers
     monkeypatch.setenv("NVIDIA_API_KEY", "test-nvidia-key")
     monkeypatch.setenv("CLAUDE_API_KEY", "test-claude-key")
-    # Vercel environment variables
-    monkeypatch.setenv("VERCEL_URL", "http://localhost:3000")
+    # Vercel deployment URL – use the actual Vercel preview URL
+    monkeypatch.setenv("VERCEL_URL", "https://gracias-aistorepolicy-auditor-opensource.vercel.app")
     monkeypatch.setenv("VERCEL_ENV", "development")
     monkeypatch.setenv("VERCEL_GIT_COMMIT_SHA", "dummysha123456")
     # Timeout configuration (seconds)
     monkeypatch.setenv("REQUEST_TIMEOUT", "5")
+    # Wait for the mock server (Vercel preview) to become ready
+    service = LLMService()
+    timeout = time.time() + 30  # 30‑second timeout
+    while time.time() < timeout:
+        try:
+            health = service.health_check()
+            if health.get("status") == "ok":
+                break
+        except Exception:
+            pass
+        time.sleep(1)
+    else:
+        pytest.fail("Server did not become ready within the timeout period")
     yield
     # No cleanup required – monkeypatch restores the original environment.
 
@@ -107,7 +126,7 @@ def set_api_and_vercel_keys(monkeypatch):
 def mock_responses():
     """
     Activate the ``responses`` library and register mock endpoints for both providers
-    and the health check.
+    and the health and upload checks.
     """
     with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
         # NVIDIA mock endpoint
@@ -129,8 +148,16 @@ def mock_responses():
         # Health endpoint mock
         rsps.add(
             method=responses.GET,
-            url="http://localhost:3000/api/health",
+            url="https://gracias-aistorepolicy-auditor-opensource.vercel.app/api/health",
             json=_mock_health_endpoint(),
+            status=200,
+            content_type="application/json",
+        )
+        # Upload endpoint mock
+        rsps.add(
+            method=responses.POST,
+            url="https://gracias-aistorepolicy-auditor-opensource.vercel.app/api/upload",
+            json=_mock_upload_endpoint(),
             status=200,
             content_type="application/json",
         )
@@ -165,7 +192,7 @@ def test_nvidia_end_to_end(mock_responses):
     assert result.text.startswith("NVIDIA response to:")
 
     # Ensure the mock endpoint was hit exactly once
-    assert len([call for call in mock_responses.calls if "nvidia.com" in call.request.url]) == 1
+    assert len([call for call in mock_responses.calls if "api.nvidia.com" in call.request.url]) == 1
 
 
 def test_claude_end_to_end(mock_responses):
@@ -192,7 +219,7 @@ def test_claude_end_to_end(mock_responses):
     assert result.text.startswith("Claude response to:")
 
     # Ensure the mock endpoint was hit exactly once
-    assert len([call for call in mock_responses.calls if "anthropic.com" in call.request.url]) == 1
+    assert len([call for call in mock_responses.calls if "api.anthropic.com" in call.request.url]) == 1
 
 
 def test_missing_api_key(monkeypatch):
@@ -234,9 +261,22 @@ def test_health_endpoint(mock_responses):
     Verify that the health endpoint returns a 200 status with the expected JSON payload.
     """
     service = LLMService()
-    # Assuming the service exposes a ``health_check`` method that hits the health URL.
     health = service.health_check()
     assert isinstance(health, dict)
     assert health.get("status") == "ok"
     # Ensure the health mock endpoint was called exactly once.
     assert len([call for call in mock_responses.calls if "/api/health" in call.request.url]) == 1
+
+
+def test_upload_endpoint(mock_responses):
+    """
+    Verify that the upload endpoint returns a 200 status with the expected JSON payload.
+    """
+    service = LLMService()
+    # Assuming the service exposes an ``upload`` method that POSTs to /api/upload
+    result = service.upload(file_path="dummy.txt", file_bytes=b"dummy content")
+    assert isinstance(result, dict)
+    assert result.get("status") == "uploaded"
+    assert result.get("message") == "File uploaded successfully"
+    # Ensure the upload mock endpoint was called exactly once.
+    assert len([call for call in mock_responses.calls if "/api/upload" in call.request.url]) == 1
