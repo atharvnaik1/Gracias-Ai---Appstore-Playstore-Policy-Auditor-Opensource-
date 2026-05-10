@@ -1,4 +1,5 @@
 typescript
+// src/app/api/audit/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { execFile } from 'child_process';
 import { promises as fs, createWriteStream } from 'fs';
@@ -12,79 +13,38 @@ import { buildRetrievedContext, type SourceFile } from '../../../utils/audit-ret
 
 const execFileAsync = promisify(execFile);
 
-// Basic in‑memory rate limiter using LRU Cache for DDoS protection
+// ────────────────────── Rate limiting ───────────────────────────────────────
 const rateLimitCache = new LRUCache<string, number>({
   max: 500,
   ttl: 1000 * 60, // 1 minute
 });
+const MAX_REQUESTS_PER_MINUTE = 30;
 
-// Force Node.js runtime (not Edge) — required for file system + streaming
+// ────────────────────── Runtime configuration ───────────────────────────────────────
 export const runtime = 'nodejs';
-
-// Increase the max request duration for large uploads + Claude analysis
 export const maxDuration = 300; // 5 minutes
 
-const MAX_UPLOAD_SIZE = 150 * 1024 * 1024; // 150 MB hard limit
-const MAX_FILE_SIZE = 50_000; // 50 KB per individual source file
-const MAX_TOTAL_CONTENT = 350_000; // 350 KB total context (≈ 90 k tokens max)
+// ────────────────────── Upload limits ───────────────────────────────────────
+const MAX_UPLOAD_SIZE = 150 * 1024 * 1024; // 150 MB
+const MAX_FILE_SIZE = 50_000; // 50 KB per source file
+const MAX_TOTAL_CONTENT = 350_000; // 350 KB total context
 
+// ────────────────────── Allowed extensions & directories ───────────────────────
 const RELEVANT_EXTENSIONS = new Set([
-  '.swift',
-  '.dart',
-  '.m',
-  '.h',
-  '.mm',
-  '.plist',
-  '.storyboard',
-  '.xib',
-  '.pbxproj',
-  '.entitlements',
-  '.json',
-  '.xml',
-  '.yaml',
-  '.yml',
-  '.md',
-  '.txt',
-  '.strings',
-  '.xcprivacy',
-  '.js',
-  '.ts',
-  '.tsx',
-  '.jsx',
-  '.java',
-  '.kt',
-  '.gradle',
-  '.pro',
-  '.properties',
-  '.html',
-  '.css',
+  '.swift', '.dart', '.m', '.h', '.mm', '.plist', '.storyboard', '.xib',
+  '.pbxproj', '.entitlements', '.json', '.xml', '.yaml', '.yml', '.md',
+  '.txt', '.strings', '.xcprivacy', '.js', '.ts', '.tsx', '.jsx', '.java',
+  '.kt', '.gradle', '.pro', '.properties', '.html', '.css',
 ]);
 
 const SKIP_DIRS = new Set([
-  'node_modules',
-  '.git',
-  'Pods',
-  'build',
-  'DerivedData',
-  '.build',
-  '.swiftpm',
-  'Carthage',
-  'vendor',
-  '__pycache__',
-  '.dart_tool',
-  // IPA‑specific: skip compiled/binary directories inside .app bundles
-  'Frameworks',
-  'PlugIns',
-  '_CodeSignature',
-  'SC_Info',
-  'Assets.car',
-  'Base.lproj',
-  // APK‑specific
-  'META-INF',
-  'assets',
-  'res/raw',
+  'node_modules', '.git', 'Pods', 'build', 'DerivedData', '.build',
+  '.swiftpm', 'Carthage', 'vendor', '__pycache__', '.dart_tool',
+  'Frameworks', 'PlugIns', '_CodeSignature', 'SC_Info', 'Assets.car',
+  'Base.lproj', 'META-INF', 'assets', 'res/raw',
 ]);
 
+// ────────────────────── Helper: client identifier ───────────────────────
 function getClientKey(req: NextRequest): string {
   const forwarded = req.headers.get('x-forwarded-for');
   if (forwarded) {
@@ -100,7 +60,7 @@ function getClientKey(req: NextRequest): string {
   return `fp:${ua}|${lang}`;
 }
 
-// ────────────────────── Multipart Parser ───────────────────────────────────────
+// ────────────────────── Types ───────────────────────────────────────
 interface ParsedUpload {
   filePath: string;
   fileName: string;
@@ -111,9 +71,10 @@ interface ParsedUpload {
   fileId?: string;
 }
 
+// ────────────────────── Multipart parser ───────────────────────────────────────
 function parseMultipartStream(req: NextRequest, tempDir: string): Promise<ParsedUpload> {
   return new Promise((resolve, reject) => {
-    const contentType = req.headers.get('content-type') || '';
+    const contentType = req.headers.get('content-type') ?? '';
     const busboy = Busboy({
       headers: { 'content-type': contentType },
       limits: { fileSize: MAX_UPLOAD_SIZE, files: 1 },
@@ -151,7 +112,7 @@ function parseMultipartStream(req: NextRequest, tempDir: string): Promise<Parsed
         return;
       }
 
-      fileName = info.filename || 'upload.ipa';
+      fileName = info.filename ?? 'upload.ipa';
       filePath = path.join(tempDir, fileName);
       fileReceived = true;
 
@@ -187,12 +148,27 @@ function parseMultipartStream(req: NextRequest, tempDir: string): Promise<Parsed
     });
 
     busboy.on('field', (fieldname, val) => {
-      if (fieldname === 'claudeApiKey' || fieldname === 'apiKey') apiKey = val;
-      if (fieldname === 'provider') provider = val;
-      if (fieldname === 'model') model = val;
-      if (fieldname === 'context') context = val;
-      if (fieldname === 'fileId') fileId = val;
-      if (fieldname === 'fileName') fileName = val;
+      switch (fieldname) {
+        case 'claudeApiKey':
+        case 'apiKey':
+          apiKey = val;
+          break;
+        case 'provider':
+          provider = val;
+          break;
+        case 'model':
+          model = val;
+          break;
+        case 'context':
+          context = val;
+          break;
+        case 'fileId':
+          fileId = val;
+          break;
+        case 'fileName':
+          fileName = val;
+          break;
+      }
     });
 
     busboy.on('finish', () => {
@@ -207,7 +183,7 @@ function parseMultipartStream(req: NextRequest, tempDir: string): Promise<Parsed
       }
       busboyFinished = true;
       if (!filePath) {
-        safeReject(new Error('No file uploaded'));
+        safeReject(new Error('File path could not be resolved'));
         return;
       }
       tryResolve();
@@ -217,17 +193,14 @@ function parseMultipartStream(req: NextRequest, tempDir: string): Promise<Parsed
       safeReject(new Error(`Upload parsing failed: ${err.message}`));
     });
 
-    // Convert the Web ReadableStream from fetch into a Node.js Readable and pipe to busboy
+    // Convert Web ReadableStream to Node.js Readable
     const reader = req.body!.getReader();
     const nodeStream = new Readable({
       async read() {
         try {
           const { done, value } = await reader.read();
-          if (done) {
-            this.push(null);
-          } else {
-            this.push(Buffer.from(value));
-          }
+          if (done) this.push(null);
+          else this.push(Buffer.from(value));
         } catch (err) {
           this.destroy(err as Error);
         }
@@ -238,7 +211,7 @@ function parseMultipartStream(req: NextRequest, tempDir: string): Promise<Parsed
   });
 }
 
-// ────────────────────── File Collection ───────────────────────────────────────
+// ────────────────────── File collector ───────────────────────────────────────
 async function collectFiles(dir: string, basePath: string = ''): Promise<SourceFile[]> {
   const files: SourceFile[] = [];
   let totalSize = 0;
@@ -260,22 +233,19 @@ async function collectFiles(dir: string, basePath: string = ''): Promise<SourceF
       const relPath = path.join(relativePath, entry.name);
 
       if (entry.isDirectory()) {
-        if (!SKIP_DIRS.has(entry.name)) {
-          await walk(fullPath, relPath);
-        }
+        if (!SKIP_DIRS.has(entry.name)) await walk(fullPath, relPath);
       } else if (entry.isFile()) {
         const ext = path.extname(entry.name).toLowerCase();
-        if (RELEVANT_EXTENSIONS.has(ext)) {
-          try {
-            const stat = await fs.stat(fullPath);
-            if (stat.size < MAX_FILE_SIZE) {
-              const content = await fs.readFile(fullPath, 'utf8');
-              totalSize += content.length;
-              files.push({ path: relPath, content });
-            }
-          } catch {
-            // ignore unreadable files
-          }
+        if (!RELEVANT_EXTENSIONS.has(ext)) continue;
+
+        try {
+          const stat = await fs.stat(fullPath);
+          if (stat.size > MAX_FILE_SIZE) continue;
+          const content = await fs.readFile(fullPath, 'utf8');
+          totalSize += content.length;
+          files.push({ path: relPath, content });
+        } catch {
+          // silently ignore unreadable files
         }
       }
     }
@@ -285,51 +255,113 @@ async function collectFiles(dir: string, basePath: string = ''): Promise<SourceF
   return files;
 }
 
-// ────────────────────── API Handler ───────────────────────────────────────
+// ────────────────────── API handler ───────────────────────────────────────
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  // ---- API‑key validation ----
-  const apiKeyHeader = req.headers.get('x-api-key');
-  const expectedKey = process.env.API_KEY; // set this env var in Vercel dashboard
-  if (!apiKeyHeader || apiKeyHeader !== expectedKey) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const clientKey = getClientKey(req);
+  const currentCount = rateLimitCache.get(clientKey) ?? 0;
 
-  try {
-    // Create a temporary directory for the upload
-    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'upload-'));
-
-    // Parse multipart form data
-    const upload = await parseMultipartStream(req, tempDir);
-
-    // ---- Rate‑limit check (optional) ----
-    const clientKey = getClientKey(req);
-    const currentCount = rateLimitCache.get(clientKey) ?? 0;
-    if (currentCount > 10) {
-      return NextResponse.json({ error: 'Too Many Requests' }, { status: 429 });
-    }
-    rateLimitCache.set(clientKey, currentCount + 1);
-
-    // ---- Process the uploaded file ----
-    // (Placeholder – replace with actual processing logic)
-    const files = await collectFiles(tempDir);
-    const context = await buildRetrievedContext(files);
-
-    // Clean up temporary directory
-    await fs.rmdir(tempDir, { recursive: true });
-
-    // ---- Successful response ----
+  if (currentCount >= MAX_REQUESTS_PER_MINUTE) {
     return NextResponse.json(
-      {
-        message: 'File processed successfully',
-        fileId: upload.fileId ?? null,
-        context,
-      },
-      { status: 200 },
+      { error: 'Rate limit exceeded. Please try again later.' },
+      { status: 429 }
     );
-  } catch (err: any) {
-    // ---- Consistent error handling ----
-    const status = err?.status ?? 400;
-    const message = err?.message ?? 'Bad Request';
-    return NextResponse.json({ error: message }, { status });
   }
+  rateLimitCache.set(clientKey, currentCount + 1);
+
+  // Validate Content‑Type early
+  const ct = req.headers.get('content-type') ?? '';
+  if (!ct.includes('multipart/form-data')) {
+    return NextResponse.json(
+      { error: 'Invalid Content-Type. Expected multipart/form-data.' },
+      { status: 400 }
+    );
+  }
+
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'audit-'));
+
+  let parsed: ParsedUpload;
+  try {
+    parsed = await parseMultipartStream(req, tempDir);
+  } catch (err: any) {
+    await fs.rmdir(tempDir, { recursive: true });
+    return NextResponse.json({ error: err.message ?? 'Upload parsing failed' }, { status: 400 });
+  }
+
+  // ---- Payload validation ----
+  if (!parsed.apiKey) {
+    await fs.rmdir(tempDir, { recursive: true });
+    return NextResponse.json({ error: 'Missing API key' }, { status: 400 });
+  }
+  if (!parsed.provider) {
+    await fs.rmdir(tempDir, { recursive: true });
+    return NextResponse.json({ error: 'Missing provider' }, { status: 400 });
+  }
+  if (!parsed.model) {
+    await fs.rmdir(tempDir, { recursive: true });
+    return NextResponse.json({ error: 'Missing model' }, { status: 400 });
+  }
+
+  // ---- Collect source files ----
+  let sourceFiles: SourceFile[] = [];
+  try {
+    sourceFiles = await collectFiles(parsed.filePath);
+    if (sourceFiles.length === 0) {
+      throw new Error('No relevant source files found in the uploaded archive');
+    }
+  } catch (err: any) {
+    await fs.rmdir(tempDir, { recursive: true });
+    return NextResponse.json({ error: err.message ?? 'File collection failed' }, { status: 400 });
+  }
+
+  // ---- Build context for audit ----
+  let context: string;
+  try {
+    context = await buildRetrievedContext(sourceFiles, parsed.context);
+  } catch (err: any) {
+    await fs.rmdir(tempDir, { recursive: true });
+    return NextResponse.json({ error: err.message ?? 'Context building failed' }, { status: 500 });
+  }
+
+  // ---- Execute audit (placeholder command) ----
+  let auditResult: string;
+  try {
+    const command = 'node';
+    const args = [
+      'audit-cli.js',
+      '--apiKey',
+      parsed.apiKey,
+      '--provider',
+      parsed.provider,
+      '--model',
+      parsed.model,
+      '--context',
+      context,
+    ];
+    const { stdout, stderr } = await execFileAsync(command, args, { timeout: 240_000 });
+    if (stderr) console.warn('Audit CLI stderr:', stderr);
+    auditResult = stdout;
+  } catch (err: any) {
+    await fs.rmdir(tempDir, { recursive: true });
+    return NextResponse.json(
+      { error: err.message ?? 'Audit execution failed' },
+      { status: 500 }
+    );
+  }
+
+  // ---- Cleanup temporary files ----
+  try {
+    await fs.rmdir(tempDir, { recursive: true });
+  } catch {
+    // ignore cleanup errors
+  }
+
+  // ---- Successful response ----
+  return NextResponse.json(
+    {
+      message: 'Audit completed successfully',
+      result: auditResult,
+      filesAnalyzed: sourceFiles.length,
+    },
+    { status: 200 }
+  );
 }

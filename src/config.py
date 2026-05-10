@@ -119,10 +119,11 @@ def _validate_key(value: str | None, name: str, default: str | None = None) -> s
     return stripped
 
 
-def _validate_uri(value: str | None, name: str, default: str) -> str:
+def _validate_uri(value: str | None, name: str, default: str | None = None) -> str:
     """
-    Validate a URI string.  If missing, fall back to ``default`` (development
-    environment).
+    Validate a URI string.  If missing and a default is provided, fall back to it
+    (development environment).  If no default is supplied, the variable is
+    considered mandatory.
 
     Parameters
     ----------
@@ -130,7 +131,7 @@ def _validate_uri(value: str | None, name: str, default: str) -> str:
         Raw value from the environment.
     name: str
         Variable name for logging / error messages.
-    default: str
+    default: str | None
         Development‑time default.
 
     Returns
@@ -141,11 +142,13 @@ def _validate_uri(value: str | None, name: str, default: str) -> str:
     Raises
     ------
     ConfigError
-        If the supplied value is not a string.
+        If the supplied value is not a string or is missing when mandatory.
     """
     if value is None:
-        LOGGER.info("%s not set – using development default.", name)
-        return default
+        if default is not None:
+            LOGGER.info("%s not set – using development default.", name)
+            return default
+        raise ConfigError(f"{name} must be set in the environment")
     if not isinstance(value, str) or not value.strip():
         raise ConfigError(f"{name} must be a non‑empty string")
     return value.strip()
@@ -170,9 +173,9 @@ def _load_config() -> dict[str, str]:
         If any required variable is missing or invalid.
     """
     try:
-        # Database URI – default to a local SQLite file for development
+        # Database URI – mandatory, no default for production
         db_uri_raw = os.getenv("DB_URI")
-        db_uri = _validate_uri(db_uri_raw, "DB_URI", "sqlite:///local.db")
+        db_uri = _validate_uri(db_uri_raw, "DB_URI")
 
         # API keys – provide dummy defaults for local development
         nvidia_raw = os.getenv("NVIDIA_API_KEY")
@@ -257,13 +260,13 @@ def get_nvidia_key() -> str:
         raise
     except Exception as exc:  # pragma: no cover
         LOGGER.exception("Unexpected error while obtaining NVIDIA API key")
-        raise ConfigError("NVIDIA API key is not configured") from exc
+        raise ConfigError("NVIDIA_API_KEY is not configured") from exc
 
 
 @lru_cache(maxsize=1)
 def get_claude_key() -> str:
     """
-    Retrieve the validated Anthropic Claude API key.
+    Retrieve the validated Claude API key.
 
     Returns
     -------
@@ -284,15 +287,4 @@ def get_claude_key() -> str:
         raise
     except Exception as exc:  # pragma: no cover
         LOGGER.exception("Unexpected error while obtaining Claude API key")
-        raise ConfigError("Claude API key is not configured") from exc
-
-
-# --------------------------------------------------------------------------- #
-# Public API of the module
-# --------------------------------------------------------------------------- #
-__all__: list[str] = [
-    "ConfigError",
-    "get_db_uri",
-    "get_nvidia_key",
-    "get_claude_key",
-]
+        raise ConfigError("CLAUDE_API_KEY is not configured") from exc

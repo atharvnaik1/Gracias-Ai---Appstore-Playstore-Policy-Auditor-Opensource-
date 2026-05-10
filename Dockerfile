@@ -6,6 +6,9 @@ dockerfile
 ############################
 FROM node:18-alpine AS builder
 
+# Set environment
+ENV NODE_ENV=production
+
 # Set working directory
 WORKDIR /app
 
@@ -16,7 +19,7 @@ RUN npm ci
 # Copy application source files (excluding files matched by .dockerignore)
 COPY . .
 
-# Build the application
+# Build the Next.js application
 RUN npm run build
 
 ############################
@@ -24,13 +27,22 @@ RUN npm run build
 ############################
 FROM node:18-alpine
 
+# Set environment
+ENV NODE_ENV=production
+
 # Set working directory
 WORKDIR /app
 
-# Copy only the built application and production dependencies
-COPY --from=builder /app/dist ./dist
+# Install only production dependencies
 COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
+RUN npm ci --only=production
+
+# Copy built application
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/next.config.js ./next.config.js
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
+COPY --from=builder /app/.env ./.env
 
 # Expose the HTTP port used by the service
 EXPOSE 3000

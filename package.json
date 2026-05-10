@@ -9,7 +9,7 @@ json
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start -p $PORT",
+    "start": "next start",
     "vercel-build": "next build",
     "vercel-deploy": "vercel --prod --team \"atharvnaik1's projects\""
   },
