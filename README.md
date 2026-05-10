@@ -1,10 +1,89 @@
-%s", result.stdout.strip())
+python
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Setup script for the llm-microservice project.
+
+This script clones the repository, creates a virtual environment, and installs
+dependencies. 
+
+⚠️ Vercel Deployment Authorization
+---------------------------------
+Before deploying this project to Vercel under the **atharvnaik1's projects** team,
+a team member must authorize the deployment. Use the following URL to grant
+access:
+
+https://vercel.com/git/authorize?team=atharvnaik1%20projects&slug=atharvnaik1s-projects&teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&type=github&job=%7B%22headInfo%22%3A%7B%22sha%22%3A%22833c0026d1efad5872766cc67c3da1240cbfaede%22%7D%2C%22id%22%3A%22QmYJzmhhoKdSXfTtDFYoLw4GaNfh5xFvwMhryCFwXaCGs6%22%2C%22org%22%3A%22atharvnaik1%22%2C%22prId%22%3A102%2C%22repo%22%3A%22ipaship-app-reviewer%22%7D)
+
+Required environment variables (example):
+    VERCEL_ORG_ID=team_c0hqDrZckNBm5AkYTYHVKoE8
+    VERCEL_PROJECT_ID=proj_XXXXXXXXXXXX
+    VERCEL_TOKEN=your_vercel_token
+
+Typical Vercel CLI workflow after authorization:
+    $ vercel login
+    $ vercel link --project <project-id> --org <org-id>
+    $ vercel env add <NAME> <VALUE> --prod   # repeat for each env var
+    $ vercel deploy --prod
+
+Ensure the above steps are completed before running this setup script.
+"""
+
+import subprocess
+import sys
+import logging
+from pathlib import Path
+
+# --------------------------------------------------------------------------- #
+# Logging configuration
+# --------------------------------------------------------------------------- #
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+LOGGER = logging.getLogger(__name__)
+
+# --------------------------------------------------------------------------- #
+# Custom exceptions
+# --------------------------------------------------------------------------- #
+class SetupError(Exception):
+    """Base class for setup related errors."""
+
+
+class GitCloneError(SetupError):
+    """Raised when git clone fails."""
+
+
+class VirtualEnvError(SetupError):
+    """Raised when virtual environment creation fails."""
+
+
+class DependencyInstallError(SetupError):
+    """Raised when pip install fails."""
+
+
+# --------------------------------------------------------------------------- #
+# Helper functions
+# --------------------------------------------------------------------------- #
+def _run_command(command: list[str]) -> subprocess.CompletedProcess:
+    """Run a shell command and return the completed process."""
+    LOGGER.debug("Running command: %s", " ".join(command))
+    result = subprocess.run(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    LOGGER.debug("Command output: %s", result.stdout.strip())
     if result.returncode != 0:
         raise subprocess.CalledProcessError(
             returncode=result.returncode,
             cmd=command,
             output=result.stdout,
         )
+    return result
 
 
 # --------------------------------------------------------------------------- #
