@@ -63,6 +63,7 @@ export default function AuditPage() {
   const [provider, setProvider] = useState('ipaship');
   const [model, setModel] = useState('glm-5.1');
   const [context, setContext] = useState('');
+  const [apiKey, setApiKey] = useState('');
   const [phase, setPhase] = useState<AuditPhase>('idle');
   const [reportContent, setReportContent] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -269,6 +270,7 @@ export default function AuditPage() {
         formData.append('provider', provider);
         formData.append('model', model);
         formData.append('context', context);
+        formData.append('apiKey', apiKey.trim());
         response = await fetch('/api/audit', { method: 'POST', body: formData });
       } else {
         // Fallback: upload + audit in one go
@@ -278,6 +280,7 @@ export default function AuditPage() {
         formData.append('provider', provider);
         formData.append('model', model);
         formData.append('context', context);
+        formData.append('apiKey', apiKey.trim());
         response = await fetch('/api/audit', { method: 'POST', body: formData });
         setPhase('analyzing');
       }
@@ -865,6 +868,23 @@ export default function AuditPage() {
                       </div>
 
                       {/* API Key */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Key className="w-3.5 h-3.5 text-amber-400" />
+                          <span className="text-xs font-semibold text-white">API Key</span>
+                        </div>
+                        <input
+                          type="password"
+                          value={apiKey}
+                          onChange={(e) => setApiKey(e.target.value)}
+                          placeholder={provider === 'ipaship' ? 'NVIDIA API key' : `Your ${providerModels[provider]?.[0] ? provider : 'provider'} API key`}
+                          autoComplete="off"
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all"
+                        />
+                        <p className="text-[10px] text-muted-foreground/60">
+                          Sent only with this audit request. Server environment keys are used as fallback when configured.
+                        </p>
+                      </div>
 
                       {/* Context */}
                       <div className="flex-1 flex flex-col space-y-2">
