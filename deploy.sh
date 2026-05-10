@@ -90,10 +90,17 @@ echo "    Build complete."
 # ─── 8. Vercel Authorization & Deployment ───────
 echo "==> [8/8] Verifying Vercel authentication and team access..."
 
-# Ensure we are logged in
-if ! vercel whoami > /dev/null 2>&1; then
-    echo "    Not logged into Vercel. Initiating login..."
-    vercel login
+# Ensure we are logged in or have a token
+if [ -z "${VERCEL_TOKEN:-}" ]; then
+    # No token provided – fall back to interactive login
+    if ! vercel whoami > /dev/null 2>&1; then
+        echo "    Not logged into Vercel. Initiating login..."
+        vercel login
+    fi
+else
+    # Token is set – export for Vercel CLI usage
+    export VERCEL_TOKEN="${VERCEL_TOKEN}"
+    echo "    Using VERCEL_TOKEN for authentication."
 fi
 
 # Verify we have access to the correct team
@@ -111,8 +118,12 @@ if ! vercel link --project "$VERCEL_PROJECT" --git-provider github --repo "athar
     exit 1
 fi
 
-# Deploy to Vercel with the correct team
-vercel --prod --team "$VERCEL_TEAM"
+# Deploy to Vercel with the correct team (use token if available)
+if [ -n "${VERCEL_TOKEN:-}" ]; then
+    vercel --prod --team "$VERCEL_TEAM" --token "$VERCEL_TOKEN"
+else
+    vercel --prod --team "$VERCEL_TEAM"
+fi
 echo "    Vercel deployment triggered."
 
 # ─── 9. PM2 ───────────────────────────────────

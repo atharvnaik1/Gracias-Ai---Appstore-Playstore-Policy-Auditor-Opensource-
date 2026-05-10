@@ -14,7 +14,7 @@ Before deploying this project to Vercel under the **atharvnaik1's projects** tea
 a team member must authorize the deployment. Use the following URL to grant
 access:
 
-https://vercel.com/git/authorize?team=atharvnaik1%20projects&slug=atharvnaik1s-projects&teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&type=github&job=%7B%22headInfo%22%3A%7B%22sha%22%3A%22833c0026d1efad5872766cc67c3da1240cbfaede%22%7D%2C%22id%22%3A%22QmYJzmhhoKdSXfTtDFYoLw4GaNfh5xFvwMhryCFwXaCGs6%22%2C%22org%22%3A%22atharvnaik1%22%2C%22prId%22%3A102%2C%22repo%22%3A%22ipaship-app-reviewer%22%7D)
+https://vercel.com/git/authorize?team=atharvnaik1%20projects&slug=atharvnaik1s-projects&teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&type=github
 
 Required environment variables (example):
     VERCEL_ORG_ID=team_c0hqDrZckNBm5AkYTYHVKoE8
@@ -38,6 +38,16 @@ from pathlib import Path
 # --------------------------------------------------------------------------- #
 # Vercel Deployment Authorization Section
 # --------------------------------------------------------------------------- #
+# Simple authorization URL (no job parameters) for team members to grant access.
+VERCEL_AUTH_URL = (
+    "https://vercel.com/git/authorize?"
+    "team=atharvnaik1%20projects&"
+    "slug=atharvnaik1s-projects&"
+    "teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&"
+    "type=github"
+)
+
+# Full URL with job context (kept for reference; not required for basic auth)
 VERCEL_AUTHORIZATION_URL = (
     "https://vercel.com/git/authorize?"
     "team=atharvnaik1%20projects&"
@@ -51,7 +61,7 @@ def get_vercel_authorization_instructions() -> str:
     """Return step‑by‑step instructions for authorizing Vercel deployment."""
     steps = [
         "1. Open the following URL in a browser:",
-        f"   {VERCEL_AUTHORIZATION_URL}",
+        f"   {VERCEL_AUTH_URL}",
         "2. Sign in to Vercel if prompted.",
         "3. Review the permissions request for the **atharvnaik1's projects** team.",
         "4. Click **Authorize** to grant access.",
@@ -202,31 +212,26 @@ def main(repo_url: str, base_dir: Path) -> None:
 
     Args:
         repo_url: HTTPS URL of the Git repository.
-        base_dir: Directory where the repository will be cloned.
+        base_dir: Base directory where the project will be set up.
     """
-    # Display Vercel deployment authorization steps before proceeding
+    # Display Vercel authorization steps before proceeding
     display_vercel_authorization_steps()
 
-    repo_dir = base_dir / "llm-microservice"
-    venv_dir = repo_dir / ".venv"
-    requirements_path = repo_dir / "requirements.txt"
+    repo_dir = base_dir / "repo"
+    venv_path = base_dir / ".venv"
+    requirements_file = repo_dir / "requirements.txt"
 
-    try:
-        clone_repository(repo_url, repo_dir)
-        create_virtual_environment(venv_dir)
-        install_dependencies(venv_dir, requirements_path)
-        LOGGER.info("Setup completed successfully.")
-    except SetupError as e:
-        LOGGER.error("Setup failed: %s", e)
-        sys.exit(1)
+    clone_repository(repo_url, repo_dir)
+    create_virtual_environment(venv_path)
+    install_dependencies(venv_path, requirements_file)
+
+    LOGGER.info("Setup completed successfully.")
 
 
 if __name__ == "__main__":
-    # Example usage:
-    # python setup.py https://github.com/atharvnaik1/ipaship-app-reviewer.git /path/to/base/dir
     if len(sys.argv) != 3:
-        LOGGER.error("Usage: %s <repo_url> <base_dir>", sys.argv[0])
-        sys.exit(2)
+        LOGGER.error("Usage: python setup.py <repo_url> <base_dir>")
+        sys.exit(1)
 
     repo_url_arg = sys.argv[1]
     base_dir_arg = Path(sys.argv[2]).expanduser().resolve()
