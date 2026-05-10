@@ -1,4 +1,20 @@
+python
 # file: llm_wrapper/config.py
+# ------------------------------------------------------------
+# Vercel Deployment Authorization
+# ------------------------------------------------------------
+# Before deploying this project to Vercel under the
+# "atharvnaik1's projects" team, a team member must authorize
+# the GitHub integration. Use the following link to grant
+# the required permissions:
+#
+# https://vercel.com/git/authorize?team=atharvnaik1's%20projects&slug=atharvnaik1s-projects&teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&type=github&job=%7B%22headInfo%22%3A%7B%22sha%22%3A%225404aa6b82d178cb7f53c8bb6d252962038819d1%22%7D%2C%22id%22%3A%22Qmema1agMRtSB3nfshejPmmAWBrYNK6zKicZTJuG9QTP1e%22%2C%22org%22%3A%22atharvnaik1%22%2C%22prId%22%3A103%2C%22repo%22%3A%22ipaship-app-reviewer%22%7D)
+#
+# Contributors should verify that the project is authorized
+# before running any deployment scripts. Failure to do so
+# will result in Vercel rejecting the deployment request.
+# ------------------------------------------------------------
+
 import os
 import logging
 from typing import Literal, Optional
