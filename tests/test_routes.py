@@ -1,3 +1,4 @@
+python
 # tests/test_routes.py
 """
 Integration tests for the HTTP endpoint exposing the unified LLM API.
@@ -7,9 +8,6 @@ The tests cover:
 - Successful request routing to the Anthropic Claude provider.
 - Proper handling of missing or invalid API keys.
 - Error mapping from external services to HTTP responses.
-
-All external HTTP calls are mocked using ``responses`` to avoid real network
-traffic. The FastAPI application is exercised with ``httpx.AsyncClient``.
 """
 
 import os
@@ -208,3 +206,16 @@ async def test_missing_prompt_returns_422(async_client: httpx.AsyncClient) -> No
     json_body = response.json()
     assert "detail" in json_body
     # The exact validation message may vary; we only assert presence.
+
+
+@pytest.mark.asyncio
+async def test_health_endpoint_returns_200_and_correct_json(async_client: httpx.AsyncClient) -> None:
+    """Validate that the health endpoint returns HTTP 200 and the expected JSON payload."""
+    response = await async_client.get("/health")
+    assert response.status_code == 200
+    json_body = response.json()
+    # Adjust the expected structure according to your implementation.
+    # Common pattern: {"status": "healthy"} or {"status": "ok"}.
+    assert isinstance(json_body, dict)
+    assert "status" in json_body
+    assert json_body["status"] in ("healthy", "ok")

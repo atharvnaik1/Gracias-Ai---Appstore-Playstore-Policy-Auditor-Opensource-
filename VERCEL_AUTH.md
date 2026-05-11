@@ -36,6 +36,15 @@ When a pull request is opened on a repository that is linked to a Vercel project
 
 ## 4. Step‑by‑Step Instructions  
 
-### 4.1 Open the Authorization URL  
+### 4.1 Generate a Vercel Authentication Token  
 
-Copy the following **URL‑encoded** link into your browser’s address bar and press **Enter**:
+1. Log in to the Vercel dashboard: https://vercel.com/dashboard.  
+2. Click on your avatar (top‑right) → **Settings** → **Tokens**.  
+3. Press **Create Token**.  
+4. Give the token a meaningful name, e.g., `ipaship-app-reviewer-ci`.  
+5. Ensure the token has **Read** and **Write** scopes (the default scopes are sufficient).  
+6. Click **Create** and copy the generated token **immediately** – you will not be able to view it again.
+
+### 4.2 Store the Token as an Environment Variable  
+
+#### For Local Development

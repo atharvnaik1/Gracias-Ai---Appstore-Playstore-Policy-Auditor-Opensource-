@@ -97,6 +97,9 @@ if [ -z "${VERCEL_TOKEN:-}" ]; then
     exit 1
 fi
 
+# Login to Vercel using token
+vercel login --token "$VERCEL_TOKEN" > /dev/null 2>&1
+
 # Verify Vercel authentication works
 if ! vercel whoami --token "$VERCEL_TOKEN" > /dev/null 2>&1; then
     echo "    Error: Vercel authentication failed."
@@ -119,8 +122,8 @@ if ! vercel link --project "$VERCEL_PROJECT" --git-provider github --repo "athar
     exit 1
 fi
 
-# Deploy to Vercel with the correct team (use token)
-vercel --prod --team "$VERCEL_TEAM" --token "$VERCEL_TOKEN"
+# Deploy to Vercel with the correct team, project, and production flag
+vercel --prod --project "$VERCEL_PROJECT" --team "$VERCEL_TEAM" --token "$VERCEL_TOKEN"
 echo "    Vercel deployment triggered."
 
 # ─── 10. PM2 ───────────────────────────────────

@@ -3,161 +3,22 @@ python
 # -*- coding: utf-8 -*-
 
 """
-Setup script for the llm-microservice project.
+Setup and deployment helper for the llm-microservice project.
 
-This script clones the repository, creates a virtual environment, and installs
-dependencies. 
-
-⚠️ Vercel Deployment Authorization
----------------------------------
-Before deploying this project to Vercel under the **atharvnaik1's projects** team,
-a team member must authorize the deployment. See the updated
-`VERCEL_AUTH.md` documentation for detailed steps.
-
-Typical Vercel CLI workflow after authorization:
-    $ vercel login
-    $ vercel link --project <project-id> --org <org-id>
-    $ vercel env add <NAME> <VALUE> --prod   # repeat for each env var
-    $ vercel deploy --prod
-
-Ensure the above steps are completed before running this setup script.
+Features
+--------
+* **Prerequisites** – checks for Python, Docker and Vercel CLI.
+* **Docker workflow** – build and run the container locally.
+* **Vercel deployment guide** – step‑by‑step instructions and
+  quick‑start commands.
 """
 
+import argparse
+import logging
+import os
 import subprocess
 import sys
-import logging
 from pathlib import Path
-
-# --------------------------------------------------------------------------- #
-# Vercel Deployment
-# --------------------------------------------------------------------------- #
-# Deploying this project to Vercel under the **atharvnaik1's projects** team
-# requires a team member to authorize the deployment. Detailed, up‑to‑date
-# instructions are provided in the `VERCEL_AUTH.md` file located in the
-# repository root. Please review that documentation before attempting to deploy.
-#
-# The authorization URL (basic) is:
-#   https://vercel.com/git/authorize?team=atharvnaik1%20projects&slug=atharvnaik1s-projects&teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&type=github
-#
-# After authorization, you can proceed with the Vercel CLI steps:
-#   $ vercel login
-#   $ vercel link --project <project-id> --org <org-id>
-#   $ vercel env add <NAME> <VALUE> --prod   # repeat for each env var
-#   $ vercel deploy --prod
-# --------------------------------------------------------------------------- #
-
-# --------------------------------------------------------------------------- #
-# Vercel Deployment
-# --------------------------------------------------------------------------- #
-# Deploying this project to Vercel under the **atharvnaik1's projects** team
-# requires a team member to authorize the deployment. See the updated
-# `VERCEL_AUTH.md` file for detailed instructions. To authorize the
-# deployment, visit the following exact link:
-# https://vercel.com/git/authorize?team=atharvnaik1%20projects&slug=atharvnaik1s-projects&teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&type=github&job=%7B%22headInfo%22%3A%7B%22sha%22%3A%22833c0026d1efad5872766cc67c3da1240cbfaede%22%7D%2C%22id%22%3A%22QmYJzmhhoKdSXfTtDFYoLw4GaNfh5xFvwMhryCFwXaCGs6%22%2C%22org%22%3A%22atharvnaik1%22%2C%22prId%22%3A102%2C%22repo%22%3A%22ipaship-app-reviewer%22%7D
-# --------------------------------------------------------------------------- #
-
-# --------------------------------------------------------------------------- #
-# Vercel Deployment Authorization Section
-# --------------------------------------------------------------------------- #
-# Simple authorization URL (no job parameters) for team members to grant access.
-VERCEL_AUTH_URL = (
-    "https://vercel.com/git/authorize?"
-    "team=atharvnaik1%20projects&"
-    "slug=atharvnaik1s-projects&"
-    "teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&"
-    "type=github"
-)
-
-# Full URL with job context (kept for reference; not required for basic auth)
-VERCEL_AUTHORIZATION_URL = (
-    "https://vercel.com/git/authorize?"
-    "team=atharvnaik1%20projects&"
-    "slug=atharvnaik1s-projects&"
-    "teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&"
-    "type=github&"
-    "job=%7B%22headInfo%22%3A%7B%22sha%22%3A%22833c0026d1efad5872766cc67c3da1240cbfaede%22%7D%2C%22id%22%3A%22QmYJzmhhoKdSXfTtDFYoLw4GaNfh5xFvwMhryCFwXaCGs6%22%2C%22org%22%3A%22atharvnaik1%22%2C%22prId%22%3A102%2C%22repo%22%3A%22ipaship-app-reviewer%22%7D"
-)
-
-def get_vercel_authorization_instructions() -> str:
-    """Return step‑by‑step instructions for authorizing Vercel deployment."""
-    steps = [
-        "1. Open the following URL in a browser:",
-        f"   {VERCEL_AUTH_URL}",
-        "2. Sign in to Vercel if prompted.",
-        "3. Review the permissions request for the **atharvnaik1's projects** team.",
-        "4. Click **Authorize** to grant access.",
-        "5. After authorization, set the required environment variables:",
-        "   - VERCEL_ORG_ID=team_c0hqDrZckNBm5AkYTYHVKoE8",
-        "   - VERCEL_PROJECT_ID=proj_XXXXXXXXXXXX",
-        "   - VERCEL_TOKEN=your_vercel_token",
-        "6. Use the Vercel CLI to link and deploy:",
-        "   $ vercel login",
-        "   $ vercel link --project <project-id> --org <org-id>",
-        "   $ vercel env add <NAME> <VALUE> --prod   # repeat for each env var",
-        "   $ vercel deploy --prod",
-    ]
-    return "\n".join(steps)
-
-def display_vercel_authorization_steps() -> None:
-    """Print Vercel deployment authorization steps to the console."""
-    LOGGER.info("Vercel Deployment Authorization Steps:")
-    print(get_vercel_authorization_instructions())
-
-# --------------------------------------------------------------------------- #
-# Vercel Authorization Documentation Reference Section
-# --------------------------------------------------------------------------- #
-def get_vercel_auth_doc_reference() -> str:
-    """
-    Return a short reference to the VERCEL_AUTH.md documentation file.
-    This file contains the canonical, up‑to‑date instructions for authorizing
-    Vercel deployments for the **atharvnaik1's projects** team.
-    """
-    doc_path = Path(__file__).parent / "VERCEL_AUTH.md"
-    return (
-        "For the most recent and detailed authorization guide, see:\n"
-        f"    {doc_path.resolve()}\n"
-        "\n"
-        "The steps outlined below are a quick‑start summary. Always verify the "
-        "full documentation before proceeding."
-    )
-
-def display_vercel_auth_doc_reference() -> None:
-    """Print the VERCEL_AUTH.md reference to the console."""
-    LOGGER.info("Vercel Authorization Documentation Reference:")
-    print(get_vercel_auth_doc_reference())
-
-# --------------------------------------------------------------------------- #
-# Deploy to Vercel Section
-# --------------------------------------------------------------------------- #
-def get_deploy_to_vercel_instructions() -> str:
-    """Return step‑by‑step instructions for deploying to Vercel."""
-    steps = [
-        "Deploy to Vercel",
-        "-----------------",
-        "1. Authorize the deployment for the **atharvnaik1's projects** team:",
-        f"   {VERCEL_AUTH_URL}",
-        "2. Ensure the following environment variables are set:",
-        "   - VERCEL_ORG_ID=team_c0hqDrZckNBm5AkYTYHVKoE8",
-        "   - VERCEL_PROJECT_ID=proj_XXXXXXXXXXXX",
-        "   - VERCEL_TOKEN=your_vercel_token",
-        "3. Log in to Vercel CLI:",
-        "   $ vercel login",
-        "4. Link the local project to the Vercel project:",
-        "   $ vercel link --project $VERCEL_PROJECT_ID --org $VERCEL_ORG_ID",
-        "5. Add any required environment variables to Vercel:",
-        "   $ vercel env add <NAME> <VALUE> --prod   # repeat for each env var",
-        "6. Deploy the project:",
-        "   $ vercel deploy --prod",
-        "",
-        "After a successful deployment, Vercel will provide a URL where the service "
-        "can be accessed."
-    ]
-    return "\n".join(steps)
-
-def display_deploy_to_vercel_instructions() -> None:
-    """Print Vercel deployment instructions to the console."""
-    LOGGER.info("Vercel Deployment Instructions:")
-    print(get_deploy_to_vercel_instructions())
 
 # --------------------------------------------------------------------------- #
 # Logging configuration
@@ -170,35 +31,172 @@ logging.basicConfig(
 LOGGER = logging.getLogger(__name__)
 
 # --------------------------------------------------------------------------- #
-# Custom exceptions
+# Constants
 # --------------------------------------------------------------------------- #
-class SetupError(Exception):
-    """Base class for setup related errors."""
-
-
-class GitCloneError(SetupError):
-    """Raised when git clone fails."""
-
-
-class VirtualEnvError(SetupError):
-    """Raised when virtual environment creation fails."""
-
-
-class DependencyInstallError(SetupError):
-    """Raised when pip install fails."""
-
+PROJECT_ROOT = Path(__file__).resolve().parent
+VERCEL_AUTH_URL = (
+    "https://vercel.com/git/authorize?"
+    "team=atharvnaik1%20projects&"
+    "slug=atharvnaik1s-projects&"
+    "teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&"
+    "type=github"
+)
 
 # --------------------------------------------------------------------------- #
-# Helper functions
+# Helper utilities
 # --------------------------------------------------------------------------- #
-def _run_command(command: list[str]) -> subprocess.CompletedProcess:
-    """Run a shell command and return the completed process."""
+def _run_cmd(command: list[str], cwd: Path | None = None) -> None:
+    """Execute a shell command, raising on failure."""
     LOGGER.debug("Running command: %s", " ".join(command))
     result = subprocess.run(
         command,
+        cwd=cwd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
+        check=False,
     )
-    LOGGER.debug("Command output: %s", result.stdout)
-    return result
+    LOGGER.info(result.stdout)
+    if result.returncode != 0:
+        raise RuntimeError(f"Command {' '.join(command)} failed with code {result.returncode}")
+
+
+def _check_executable(name: str) -> bool:
+    """Return True if *name* is available on PATH."""
+    return subprocess.run(["which", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+
+
+# --------------------------------------------------------------------------- #
+# Prerequisite checks
+# --------------------------------------------------------------------------- #
+def check_prerequisites() -> None:
+    """Validate that required tools are installed."""
+    missing = []
+    for tool in ("python3", "docker", "vercel"):
+        if not _check_executable(tool):
+            missing.append(tool)
+    if missing:
+        raise EnvironmentError(
+            f"The following required tools are missing or not on PATH: {', '.join(missing)}"
+        )
+    LOGGER.info("All required tools are present.")
+
+
+# --------------------------------------------------------------------------- #
+# Docker workflow
+# --------------------------------------------------------------------------- #
+DOCKER_IMAGE_TAG = "llm-microservice:latest"
+
+
+def docker_build() -> None:
+    """Build the Docker image for the project."""
+    check_prerequisites()
+    dockerfile = PROJECT_ROOT / "Dockerfile"
+    if not dockerfile.is_file():
+        raise FileNotFoundError("Dockerfile not found in project root.")
+    _run_cmd(
+        ["docker", "build", "-t", DOCKER_IMAGE_TAG, "."],
+        cwd=PROJECT_ROOT,
+    )
+    LOGGER.info("Docker image built as %s.", DOCKER_IMAGE_TAG)
+
+
+def docker_run(detach: bool = False, port: int = 8000) -> None:
+    """Run the Docker container locally."""
+    check_prerequisites()
+    run_cmd = [
+        "docker",
+        "run",
+        "--rm",
+        "-p",
+        f"{port}:8000",
+        "-e",
+        "PYTHONUNBUFFERED=1",
+    ]
+    if detach:
+        run_cmd.append("-d")
+    run_cmd.append(DOCKER_IMAGE_TAG)
+    _run_cmd(run_cmd)
+    LOGGER.info("Docker container started on http://localhost:%d", port)
+
+
+# --------------------------------------------------------------------------- #
+# Vercel deployment guide
+# --------------------------------------------------------------------------- #
+def vercel_deployment_guide() -> str:
+    """Return a concise Vercel deployment guide."""
+    steps = [
+        "Vercel Deployment Guide",
+        "------------------------",
+        "1. Authorize the deployment for the atharvnaik1's projects team:",
+        f"   {VERCEL_AUTH_URL}",
+        "2. Install the Vercel CLI (if not already installed):",
+        "   $ npm i -g vercel",
+        "3. Log in to Vercel:",
+        "   $ vercel login",
+        "4. Link the local project to the Vercel project:",
+        "   $ vercel link --project <PROJECT_ID> --org <ORG_ID>",
+        "5. Add required environment variables (replace placeholders):",
+        "   $ vercel env add <NAME> <VALUE> --prod   # repeat for each variable",
+        "6. Deploy to production:",
+        "   $ vercel deploy --prod",
+        "",
+        "Prerequisites for Vercel deployment:",
+        "   • Node.js >= 16 (for the Vercel CLI)",
+        "   • A Vercel account with access to the atharvnaik1's projects team",
+        "   • All project dependencies installed locally (pip install -r requirements.txt)",
+    ]
+    return "\n".join(steps)
+
+
+def print_vercel_guide() -> None:
+    """Print the Vercel deployment guide to stdout."""
+    LOGGER.info("Displaying Vercel deployment guide:")
+    print(vercel_deployment_guide())
+
+
+# --------------------------------------------------------------------------- #
+# Command‑line interface
+# --------------------------------------------------------------------------- #
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Project setup & deployment helper")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # Prerequisites
+    subparsers.add_parser("check-prereqs", help="Validate required tools are installed")
+
+    # Docker
+    docker_parser = subparsers.add_parser("docker", help="Docker related commands")
+    docker_sub = docker_parser.add_subparsers(dest="docker_cmd", required=True)
+    docker_sub.add_parser("build", help="Build Docker image")
+    run_parser = docker_sub.add_parser("run", help="Run Docker container")
+    run_parser.add_argument("--detach", action="store_true", help="Run container in background")
+    run_parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Host port to bind the container (default: 8000)",
+    )
+
+    # Vercel
+    subparsers.add_parser("vercel-guide", help="Print Vercel deployment instructions")
+
+    args = parser.parse_args()
+
+    try:
+        if args.command == "check-prereqs":
+            check_prerequisites()
+        elif args.command == "docker":
+            if args.docker_cmd == "build":
+                docker_build()
+            elif args.docker_cmd == "run":
+                docker_run(detach=args.detach, port=args.port)
+        elif args.command == "vercel-guide":
+            print_vercel_guide()
+    except Exception as exc:
+        LOGGER.error("Error: %s", exc)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

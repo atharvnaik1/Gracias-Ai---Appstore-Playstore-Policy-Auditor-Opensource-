@@ -6,14 +6,17 @@ json
   "gitRepository": {
     "slug": "ipaship-app-reviewer"
   },
-  "build": {
-    "src": "src/index.js",
-    "use": "@vercel/node"
-  },
-  "routes": [
+  "builds": [
     {
-      "src": "/(.*)",
-      "dest": "/src/index.js"
+      "src": "src/**",
+      "use": "@vercel/next"
+    }
+  ],
+  "outputDirectory": "public",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
     }
   ],
   "env": {

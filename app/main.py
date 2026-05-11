@@ -1,8 +1,67 @@
-\nHuman: {prompt}\n\nAssistant:",
+python
+import os
+import logging
+from typing import Optional, Literal
+
+import httpx
+import uvicorn
+from fastapi import FastAPI, Request, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ValidationError
+
+# --------------------------------------------------------------------------- #
+# Configuration / Constants
+# --------------------------------------------------------------------------- #
+NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
+CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
+logger = logging.getLogger(__name__)
+
+# --------------------------------------------------------------------------- #
+# FastAPI app initialization
+# --------------------------------------------------------------------------- #
+app = FastAPI(title="LLM Generation Service")
+
+# --------------------------------------------------------------------------- #
+# Pydantic models
+# --------------------------------------------------------------------------- #
+class GenerateRequest(BaseModel):
+    prompt: str
+    provider: Optional[Literal["nvidia", "claude"]] = None
+    max_tokens: int = 256
+
+
+class GenerateResponse(BaseModel):
+    provider: str
+    completion: str
+    usage: Optional[dict] = None
+
+
+# --------------------------------------------------------------------------- #
+# LLM client implementation
+# --------------------------------------------------------------------------- #
+class LLMClient:
+    def __init__(self, http_client: httpx.AsyncClient):
+        self._http = http_client
+
+    async def _call_nvidia(self, prompt: str, max_tokens: int):
+        endpoint = "https://api.nvidia.com/v1/generate"
+        payload = {
+            "prompt": f"\nHuman: {prompt}\n\nAssistant:",
+            "max_tokens_to_sample": max_tokens,
+        }
+        logger.debug("Calling NVIDIA endpoint %s", endpoint)
+        response = await self._http.post(endpoint, json=payload)
+        response.raise_for_status()
+        return response.json()
+
+    async def _call_claude(self, prompt: str, max_tokens: int):
+        endpoint = "https://api.anthropic.com/v1/complete"
+        payload = {
+            "prompt": f"\nHuman: {prompt}\n\nAssistant:",
             "max_tokens_to_sample": max_tokens,
         }
         logger.debug("Calling Claude endpoint %s", endpoint)
-        response = await self._http.post(endpoint, json=payload, headers=headers)
+        response = await self._http.post(endpoint, json=payload)
         response.raise_for_status()
         return response.json()
 
@@ -12,29 +71,6 @@
         provider: Optional[Literal["nvidia", "claude"]] = None,
         max_tokens: int = 256,
     ) -> GenerateResponse:
-        """
-        Generate a completion using the configured provider.
-
-        Parameters
-        ----------
-        prompt: str
-            Input text for the LLM.
-        provider: Literal["nvidia", "claude"] | None
-            Explicit provider name; if ``None`` the client picks the first
-            available provider based on configured API keys.
-        max_tokens: int
-            Upper bound for generated tokens.
-
-        Returns
-        -------
-        GenerateResponse
-            The provider used, the generated text and optional usage data.
-
-        Raises
-        ------
-        HTTPException
-            If no provider is configured or the upstream call fails.
-        """
         # Resolve provider
         if provider is None:
             if NVIDIA_API_KEY:
@@ -154,3 +190,24 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
         "HTTPException %s at %s – %s", exc.status_code, request.url.path, exc.detail
     )
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
+# --------------------------------------------------------------------------- #
+# Application startup / shutdown events
+# --------------------------------------------------------------------------- #
+@app.on_event("startup")
+async def startup_event():
+    app.state.http_client = httpx.AsyncClient()
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    await app.state.http_client.aclose()
+
+
+# --------------------------------------------------------------------------- #
+# Run the FastAPI application
+# --------------------------------------------------------------------------- #
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run(app, host="0.0.0.0", port=port)
