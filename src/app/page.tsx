@@ -17,6 +17,11 @@ import { UserButton, SignedOut, SignedIn, useAuth, useClerk } from '@clerk/nextj
 type AuditPhase = 'idle' | 'uploading' | 'analyzing' | 'complete' | 'error';
 
 const providerModels: Record<string, { label: string; value: string }[]> = {
+  nvidia: [
+    { label: 'Llama 3.1 405B', value: 'meta/llama-3.1-405b-instruct' },
+    { label: 'Llama 3.1 70B', value: 'meta/llama-3.1-70b-instruct' },
+    { label: 'Nemotron Ultra', value: 'nvidia/llama-3.1-nemotron-ultra-253b-v1' },
+  ],
   anthropic: [
     { label: 'Claude Sonnet 4', value: 'claude-sonnet-4-20250514' },
     { label: 'Claude 3.5 Sonnet', value: 'claude-3-5-sonnet-20241022' },
@@ -60,8 +65,9 @@ const selectStyle = {
 
 export default function AuditPage() {
   const [file, setFile] = useState<File | null>(null);
-  const [provider, setProvider] = useState('ipaship');
-  const [model, setModel] = useState('glm-5.1');
+  const [provider, setProvider] = useState('nvidia');
+  const [model, setModel] = useState('meta/llama-3.1-405b-instruct');
+  const [apiKey, setApiKey] = useState('');
   const [context, setContext] = useState('');
   const [phase, setPhase] = useState<AuditPhase>('idle');
   const [reportContent, setReportContent] = useState('');
@@ -98,6 +104,11 @@ export default function AuditPage() {
       .then(data => { setStarCount(data.stars ?? 0); })
       .catch(() => { setStarCount(0); });
   }, []);
+
+  useEffect(() => {
+    const savedKey = window.localStorage.getItem(`ipaship:${provider}:api-key`) || '';
+    setApiKey(savedKey);
+  }, [provider]);
 
 
   // Auto-start audit as soon as upload finishes
@@ -268,6 +279,7 @@ export default function AuditPage() {
         formData.append('fileName', file.name);
         formData.append('provider', provider);
         formData.append('model', model);
+        formData.append('apiKey', apiKey);
         formData.append('context', context);
         response = await fetch('/api/audit', { method: 'POST', body: formData });
       } else {
@@ -277,6 +289,7 @@ export default function AuditPage() {
         formData.append('file', file);
         formData.append('provider', provider);
         formData.append('model', model);
+        formData.append('apiKey', apiKey);
         formData.append('context', context);
         response = await fetch('/api/audit', { method: 'POST', body: formData });
         setPhase('analyzing');
@@ -846,6 +859,7 @@ export default function AuditPage() {
                           className="w-full bg-white/5 border border-white/10 text-xs text-white font-medium px-3 py-2.5 rounded-xl outline-none focus:ring-1 focus:ring-primary/50 appearance-none cursor-pointer hover:bg-white/[0.08] transition-colors"
                           style={selectStyle}
                         >
+                          <option value="nvidia">NVIDIA NIM</option>
                           <option value="ipaship">ipaShip AI</option>
                           <option value="anthropic">Anthropic (Claude)</option>
                           <option value="openai">OpenAI (GPT)</option>
@@ -865,6 +879,33 @@ export default function AuditPage() {
                       </div>
 
                       {/* API Key */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Key className="w-3.5 h-3.5 text-green-400" />
+                          <span className="text-xs font-semibold text-white">API Key</span>
+                        </div>
+                        <input
+                          type="password"
+                          value={apiKey}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setApiKey(value);
+                            if (value.trim()) {
+                              window.localStorage.setItem(`ipaship:${provider}:api-key`, value);
+                            } else {
+                              window.localStorage.removeItem(`ipaship:${provider}:api-key`);
+                            }
+                          }}
+                          placeholder={
+                            provider === 'nvidia' || provider === 'ipaship'
+                              ? 'NVIDIA API key'
+                              : provider === 'anthropic'
+                                ? 'Anthropic API key'
+                                : `${provider} API key`
+                          }
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-green-500/50 focus:ring-1 focus:ring-green-500/50 transition-all"
+                        />
+                      </div>
 
                       {/* Context */}
                       <div className="flex-1 flex flex-col space-y-2">
@@ -943,7 +984,7 @@ export default function AuditPage() {
                       icon: <Lock className="w-5 h-5 text-green-400" />,
                       iconBg: 'bg-green-500/10 border-green-500/20',
                       title: 'Zero Trust Security',
-                      desc: 'Your code is processed in ephemeral temp storage and deleted immediately. API keys stay in your browser, never on our servers.',
+                      desc: 'Your code is processed in ephemeral temp storage and deleted immediately. API keys are used only for the selected provider request.',
                     },
                     {
                       icon: <Code2 className="w-5 h-5 text-blue-400" />,
@@ -955,7 +996,7 @@ export default function AuditPage() {
                       icon: <Cpu className="w-5 h-5 text-purple-400" />,
                       iconBg: 'bg-purple-500/10 border-purple-500/20',
                       title: 'Multi-Provider BYOK',
-                      desc: 'Bring your own key from Anthropic, OpenAI, Google Gemini, or OpenRouter. Choose the model that works best for you.',
+                      desc: 'Bring your own key from NVIDIA NIM, Anthropic, OpenAI, Google Gemini, or OpenRouter. Choose the model that works best for you.',
                     },
                     {
                       icon: <FileText className="w-5 h-5 text-cyan-400" />,
@@ -1056,7 +1097,7 @@ export default function AuditPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         {[
                           { title: 'No Cloud Storage', desc: 'Files are processed in ephemeral temp directories and deleted immediately after audit.' },
-                          { title: 'Bring Your Own Key', desc: 'Your API key goes directly to your AI provider. We never store or log it.' },
+                          { title: 'Bring Your Own Key', desc: 'Your API key is used only for the selected audit request. We never store or log it.' },
                           { title: 'Fully Auditable', desc: 'Read every line of our open-source code on GitHub. Full transparency.' },
                         ].map((item) => (
                           <div key={item.title} className="flex gap-3">

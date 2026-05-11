@@ -8,11 +8,11 @@ AI-powered iOS App Store compliance auditor. Upload your `.ipa` file and get a c
 
 - **IPA Analysis** — Upload `.ipa` files (up to 150MB) for automated compliance auditing
 - **Full Guidelines Coverage** — Checks all 6 major App Store Review Guideline categories: Safety, Performance, Business, Design, Legal & Privacy, and Technical
-- **Multi-Provider AI** — Bring your own key from Anthropic (Claude), OpenAI (GPT), Google Gemini, or OpenRouter
-- **Model Selection** — Choose specific models per provider (Claude Sonnet 4, GPT-4o, Gemini 2.5 Flash, etc.)
+- **Multi-Provider AI** — Bring your own key from NVIDIA NIM, Anthropic (Claude), OpenAI (GPT), Google Gemini, or OpenRouter
+- **Model Selection** — Choose specific models per provider (NVIDIA Llama/Nemotron, Claude Sonnet 4, GPT-4o, Gemini 2.5 Flash, etc.)
 - **Real-Time Streaming** — Watch your audit report generate live as the AI analyzes your code
 - **Export Reports** — Download as Markdown or PDF
-- **Zero-Trust Security** — Files processed in ephemeral temp storage and deleted immediately. API keys stay in your browser, never on our servers
+- **Zero-Trust Security** — Files processed in ephemeral temp storage and deleted immediately. API keys are used only for the selected provider request and are never stored
 - **100% Open Source** — Fully auditable codebase
 
 ## Tech Stack
@@ -22,7 +22,7 @@ AI-powered iOS App Store compliance auditor. Upload your `.ipa` file and get a c
 | Frontend | Next.js 15, React 19, TypeScript, Tailwind CSS, Framer Motion |
 | Backend | Next.js API Routes (Node.js) |
 | Database | MongoDB (Mongoose) |
-| AI Providers | Anthropic, OpenAI, Google Gemini, OpenRouter |
+| AI Providers | NVIDIA NIM, Anthropic, OpenAI, Google Gemini, OpenRouter |
 | File Processing | Busboy (streaming uploads), `unzip` (IPA extraction) |
 | Export | html2pdf.js, React Markdown |
 
@@ -194,7 +194,7 @@ The script sets up Node.js 20, PM2, Nginx (with streaming/upload support), and U
 ## Security
 
 - **No cloud storage** — Files are processed in ephemeral `/tmp` directories and deleted immediately after audit
-- **BYOK (Bring Your Own Key)** — API keys are stored in your browser's localStorage, never sent to our servers
+- **BYOK (Bring Your Own Key)** — API keys are stored in your browser's localStorage and sent only for the selected audit request, never persisted server-side
 - **No shell injection** — File extraction uses `execFile` (no shell), preventing command injection via filenames
 - **Binary detection** — Binary plists and compiled files are detected and skipped
 - **Rate limiting** — 5 requests per IP per minute via in-memory LRU cache
