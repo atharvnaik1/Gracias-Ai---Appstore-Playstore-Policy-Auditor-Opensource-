@@ -29,6 +29,24 @@ import logging
 from pathlib import Path
 
 # --------------------------------------------------------------------------- #
+# Vercel Deployment
+# --------------------------------------------------------------------------- #
+# Deploying this project to Vercel under the **atharvnaik1's projects** team
+# requires a team member to authorize the deployment. Detailed, up‑to‑date
+# instructions are provided in the `VERCEL_AUTH.md` file located in the
+# repository root. Please review that documentation before attempting to deploy.
+#
+# The authorization URL (basic) is:
+#   https://vercel.com/git/authorize?team=atharvnaik1%20projects&slug=atharvnaik1s-projects&teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&type=github
+#
+# After authorization, you can proceed with the Vercel CLI steps:
+#   $ vercel login
+#   $ vercel link --project <project-id> --org <org-id>
+#   $ vercel env add <NAME> <VALUE> --prod   # repeat for each env var
+#   $ vercel deploy --prod
+# --------------------------------------------------------------------------- #
+
+# --------------------------------------------------------------------------- #
 # Vercel Deployment Authorization Section
 # --------------------------------------------------------------------------- #
 # Simple authorization URL (no job parameters) for team members to grant access.
@@ -202,76 +220,46 @@ def clone_repository(repo_url: str, target_dir: Path) -> None:
         raise ValueError(f"Target directory '{target_dir}' already exists.")
 
     try:
-        LOGGER.info("Cloning repository %s → %s", repo_url, target_dir)
+        LOGGER.info("Cloning repository %s into %s", repo_url, target_dir)
         _run_command(["git", "clone", repo_url, str(target_dir)])
-        LOGGER.info("Repository cloned successfully.")
-    except subprocess.CalledProcessError as exc:
-        raise GitCloneError(f"Failed to clone repository: {exc.output}") from exc
+    except subprocess.CalledProcessError as e:
+        raise GitCloneError(f"Failed to clone repository: {e}") from e
 
-
-def create_virtual_environment(venv_path: Path) -> None:
-    """Create a Python virtual environment.
-
-    Args:
-        venv_path: Path where the virtual environment should be created.
-
-    Raises:
-        VirtualEnvError: If the ``python -m venv`` command fails.
-    """
-    if venv_path.exists():
-        LOGGER.warning("Virtual environment already exists at %s", venv_path)
-        return
+def create_virtualenv(env_path: Path) -> None:
+    """Create a Python virtual environment."""
+    if env_path.exists():
+        raise ValueError(f"Virtual environment directory '{env_path}' already exists.")
     try:
-        LOGGER.info("Creating virtual environment at %s", venv_path)
-        _run_command([sys.executable, "-m", "venv", str(venv_path)])
-        LOGGER.info("Virtual environment created successfully.")
-    except subprocess.CalledProcessError as exc:
-        raise VirtualEnvError(f"Failed to create virtual environment: {exc.output}") from exc
+        LOGGER.info("Creating virtual environment at %s", env_path)
+        _run_command([sys.executable, "-m", "venv", str(env_path)])
+    except subprocess.CalledProcessError as e:
+        raise VirtualEnvError(f"Failed to create virtual environment: {e}") from e
 
-
-def install_dependencies(venv_path: Path, requirements_file: Path) -> None:
-    """Install dependencies using pip inside the virtual environment.
-
-    Args:
-        venv_path: Path to the virtual environment.
-        requirements_file: Path to a requirements.txt file.
-
-    Raises:
-        DependencyInstallError: If pip install fails.
-    """
-    pip_executable = venv_path / "bin" / "pip"
-    if not pip_executable.is_file():
-        raise DependencyInstallError("pip executable not found in virtual environment.")
+def install_dependencies(env_path: Path, requirements_file: Path) -> None:
+    """Install dependencies from a requirements.txt file."""
+    pip_executable = env_path / "bin" / "pip"
+    if not pip_executable.exists():
+        raise ValueError(f"pip not found in virtual environment at {pip_executable}")
+    if not requirements_file.is_file():
+        raise ValueError(f"Requirements file {requirements_file} does not exist.")
     try:
         LOGGER.info("Installing dependencies from %s", requirements_file)
         _run_command([str(pip_executable), "install", "-r", str(requirements_file)])
-        LOGGER.info("Dependencies installed successfully.")
-    except subprocess.CalledProcessError as exc:
-        raise DependencyInstallError(f"Failed to install dependencies: {exc.output}") from exc
+    except subprocess.CalledProcessError as e:
+        raise DependencyInstallError(f"Failed to install dependencies: {e}") from e
 
-
-# --------------------------------------------------------------------------- #
-# Main entry point
-# --------------------------------------------------------------------------- #
 def main() -> None:
-    # Example usage (replace with real values as needed)
+    """Main entry point for the setup script."""
     repo_url = "https://github.com/atharvnaik1/ipaship-app-reviewer.git"
     target_dir = Path.cwd() / "ipaship-app-reviewer"
-    venv_path = target_dir / ".venv"
-    requirements_file = target_dir / "requirements.txt"
+    env_dir = target_dir / ".venv"
+    requirements = target_dir / "requirements.txt"
 
-    # Display Vercel authorization reference before any other actions
-    display_vercel_auth_doc_reference()
-    display_vercel_authorization_steps()
-
-    # Proceed with setup
     clone_repository(repo_url, target_dir)
-    create_virtual_environment(venv_path)
-    install_dependencies(venv_path, requirements_file)
+    create_virtualenv(env_dir)
+    install_dependencies(env_dir, requirements)
 
-    # Finally, show deployment instructions
-    display_deploy_to_vercel_instructions()
-
+    LOGGER.info("Setup completed successfully.")
 
 if __name__ == "__main__":
     main()

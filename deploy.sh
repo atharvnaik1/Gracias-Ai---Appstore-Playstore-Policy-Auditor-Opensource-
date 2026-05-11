@@ -101,15 +101,23 @@ else
     echo "    Using VERCEL_AUTH token for authentication."
 fi
 
+# Verify Vercel authentication works
+if ! vercel whoami --token "$VERCEL_TOKEN" > /dev/null 2>&1; then
+    echo "    Error: Vercel authentication failed."
+    echo "    Please authorize the deployment using the following URL:"
+    echo "    https://vercel.com/git/authorize?team=${VERCEL_TEAM}%20projects&slug=atharvnaik1s-projects&teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&type=github&job=%7B%22headInfo%22%3A%7B%22sha%22%3A%22833c0026d1efad5872766cc67c3da1240cbfaede%22%7D%2C%22id%22%3A%22QmYJzmhhoKdSXfTtDFYoLw4GaNfh5xFvwMhryCFwXaCGs6%22%2C%22org%22%3A%22atharvnaik1%22%2C%22prId%22%3A102%2C%22repo%22%3A%22ipaship-app-reviewer%22%7D"
+    exit 1
+fi
+
 # Verify we have access to the correct team
-if ! vercel teams list | grep -q "$VERCEL_TEAM"; then
+if ! vercel teams list --token "$VERCEL_TOKEN" | grep -q "$VERCEL_TEAM"; then
     echo "    Error: Vercel team '$VERCEL_TEAM' not found in your account."
     echo "    Please ensure you are a member of the team and re-run the script."
     exit 1
 fi
 
 # Link the repository to the Vercel project (fails if repo not authorized)
-if ! vercel link --project "$VERCEL_PROJECT" --git-provider github --repo "atharvnaik1/ipaShip-Ai---Appstore-Playstore-Policy-Auditor-Opensource-" --team "$VERCEL_TEAM" > /dev/null 2>&1; then
+if ! vercel link --project "$VERCEL_PROJECT" --git-provider github --repo "atharvnaik1/ipaShip-Ai---Appstore-Playstore-Policy-Auditor-Opensource-" --team "$VERCEL_TEAM" --token "$VERCEL_TOKEN" > /dev/null 2>&1; then
     echo "    Error: Repository is not authorized for team '$VERCEL_TEAM'."
     echo "    Please authorize the repository via the Vercel dashboard or the provided URL."
     echo "    https://vercel.com/git/authorize?team=${VERCEL_TEAM}%20projects&slug=atharvnaik1s-projects&teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&type=github&job=%7B%22headInfo%22%3A%7B%22sha%22%3A%22833c0026d1efad5872766cc67c3da1240cbfaede%22%7D%2C%22id%22%3A%22QmYJzmhhoKdSXfTtDFYoLw4GaNfh5xFvwMhryCFwXaCGs6%22%2C%22org%22%3A%22atharvnaik1%22%2C%22prId%22%3A102%2C%22repo%22%3A%22ipaship-app-reviewer%22%7D"
