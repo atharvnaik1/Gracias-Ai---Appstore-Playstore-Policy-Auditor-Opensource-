@@ -79,6 +79,10 @@ export default function AuditPage() {
   const [uploadedFileId, setUploadedFileId] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState('');
   const [isAutoAnalyzing, setIsAutoAnalyzing] = useState(false);
+  const [debugPrompt, setDebugPrompt] = useState('');
+  const [debugBreakpoints, setDebugBreakpoints] = useState('meta,error,complete');
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+  const [lastBreakpoint, setLastBreakpoint] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const reportRef = useRef<HTMLDivElement>(null);
@@ -114,6 +118,25 @@ export default function AuditPage() {
     }
   }, [uploadedFileId]);
 
+  const logDebugger = useCallback((event: string, detail: string) => {
+    const breakpointTerms = debugBreakpoints
+      .split(',')
+      .map((term) => term.trim().toLowerCase())
+      .filter(Boolean);
+    const searchable = `${event} ${detail}`.toLowerCase();
+    const matched = breakpointTerms.find((term) => searchable.includes(term));
+
+    if (matched) {
+      setLastBreakpoint(`${event}: ${detail}`);
+    }
+
+    const timestamp = new Date().toLocaleTimeString();
+    setDebugLogs((current) => [
+      `[${timestamp}] ${event}: ${detail}`,
+      ...current,
+    ].slice(0, 50));
+  }, [debugBreakpoints]);
+
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -134,6 +157,7 @@ export default function AuditPage() {
     setUploadSpeed('');
     setUploadError('');
     setIsUploading(true);
+    logDebugger('upload:start', `${picked.name} (${formatFileSize(picked.size)})`);
 
     const formData = new FormData();
     formData.append('file', picked);
@@ -170,15 +194,19 @@ export default function AuditPage() {
           const data = JSON.parse(xhr.responseText);
           setUploadedFileId(data.fileId);
           setUploadProgress(100);
+          logDebugger('upload:complete', `fileId=${data.fileId}`);
         } catch {
           setUploadError('Upload response invalid.');
+          logDebugger('upload:error', 'Upload response invalid');
         }
       } else {
         try {
           const data = JSON.parse(xhr.responseText);
           setUploadError(data.error || 'Upload failed.');
+          logDebugger('upload:error', data.error || 'Upload failed');
         } catch {
           setUploadError('Upload failed.');
+          logDebugger('upload:error', 'Upload failed');
         }
       }
     });
@@ -186,11 +214,12 @@ export default function AuditPage() {
     xhr.addEventListener('error', () => {
       setIsUploading(false);
       setUploadError('Upload failed. Check your connection.');
+      logDebugger('upload:error', 'Connection error');
     });
 
     xhr.open('POST', '/api/upload');
     xhr.send(formData);
-  }, []);
+  }, [logDebugger]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -257,6 +286,9 @@ export default function AuditPage() {
     setErrorMessage('');
     setFilesScanned(0);
     setFileNames([]);
+    setDebugLogs([]);
+    setLastBreakpoint('');
+    logDebugger('audit:start', `${provider}/${model}`);
 
     try {
       let response: Response;
@@ -309,10 +341,15 @@ export default function AuditPage() {
               setFilesScanned(parsed.filesScanned);
               totalScannedTemp = parsed.filesScanned;
               setFileNames(parsed.fileNames || []);
+              logDebugger('stream:meta', `${parsed.filesScanned} files queued`);
             } else if (parsed.type === 'content') {
               accumulated += parsed.text;
               setReportContent(accumulated);
+              if (accumulated.length === parsed.text.length) {
+                logDebugger('stream:content', 'first report chunk received');
+              }
             } else if (parsed.type === 'error') {
+              logDebugger('stream:error', parsed.message);
               throw new Error(parsed.message);
             }
           } catch (e: any) {
@@ -322,6 +359,7 @@ export default function AuditPage() {
       }
 
       setPhase('complete');
+      logDebugger('audit:complete', `${totalScannedTemp} files scanned`);
       fetch('/api/save-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -331,6 +369,7 @@ export default function AuditPage() {
     } catch (err: any) {
       console.error('Audit error:', err);
       setErrorMessage(err.message || 'An unexpected error occurred');
+      logDebugger('audit:error', err.message || 'An unexpected error occurred');
       setPhase('error');
     }
   };
@@ -879,6 +918,29 @@ export default function AuditPage() {
                           className="w-full flex-1 min-h-[60px] bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all resize-none custom-scrollbar"
                         />
                       </div>
+
+                      {/* AI Debugger */}
+                      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3 space-y-3">
+                        <div className="flex items-center gap-2">
+                          <Code2 className="w-3.5 h-3.5 text-primary" />
+                          <span className="text-xs font-semibold text-white">AI Debugger</span>
+                        </div>
+                        <textarea
+                          value={debugPrompt}
+                          onChange={(e) => setDebugPrompt(e.target.value)}
+                          placeholder="Prompt for debugging focus, e.g. pause on entitlement or privacy manifest findings..."
+                          className="w-full min-h-[50px] bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-[11px] text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/50 transition-all resize-none custom-scrollbar"
+                        />
+                        <input
+                          value={debugBreakpoints}
+                          onChange={(e) => setDebugBreakpoints(e.target.value)}
+                          placeholder="Breakpoint keywords, comma-separated"
+                          className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-[11px] text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/50 transition-all"
+                        />
+                        <div className="text-[10px] text-muted-foreground">
+                          Matches stream events and keeps the latest state visible during analysis.
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -1195,6 +1257,35 @@ export default function AuditPage() {
                       </AnimatePresence>
                     </div>
                   )}
+
+                  <div className="mt-6 w-full max-w-sm rounded-xl border border-white/10 bg-black/30 p-3 text-left">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <span className="text-[11px] font-semibold text-white flex items-center gap-2">
+                        <Code2 className="w-3.5 h-3.5 text-primary" />
+                        Debugger
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">{debugLogs.length} events</span>
+                    </div>
+                    {debugPrompt && (
+                      <div className="mb-2 rounded-lg bg-primary/10 border border-primary/20 px-2 py-1.5 text-[10px] text-primary">
+                        Prompt: {debugPrompt}
+                      </div>
+                    )}
+                    {lastBreakpoint && (
+                      <div className="mb-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-2 py-1.5 text-[10px] text-amber-200">
+                        Breakpoint matched: {lastBreakpoint}
+                      </div>
+                    )}
+                    <div className="max-h-28 overflow-y-auto custom-scrollbar space-y-1">
+                      {debugLogs.length === 0 ? (
+                        <div className="text-[10px] text-muted-foreground">Waiting for audit events...</div>
+                      ) : debugLogs.map((entry, index) => (
+                        <div key={`${entry}-${index}`} className="text-[10px] font-mono text-muted-foreground">
+                          {entry}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
 
