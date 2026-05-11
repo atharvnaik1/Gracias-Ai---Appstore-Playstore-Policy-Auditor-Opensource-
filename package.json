@@ -8,7 +8,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start -H 0.0.0.0 -p 8080"
+    "start": "next start -H 0.0.0.0 -p 8080",
+    "test": "node --test src/app/api/audit/provider-utils.test.mjs"
   },
   "keywords": [],
   "author": "",

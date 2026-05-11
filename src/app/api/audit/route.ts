@@ -8,6 +8,7 @@ import { Readable } from 'stream';
 import Busboy from 'busboy';
 import { LRUCache } from 'lru-cache';
 import { buildRetrievedContext, type SourceFile } from '../../../utils/audit-retrieval';
+import { extractTextFromProviderChunk, resolveProviderApiKey } from './provider-utils';
 
 const execFileAsync = promisify(execFile);
 
@@ -453,11 +454,11 @@ export async function POST(req: NextRequest) {
 
     // Stream-parse the multipart upload — writes file directly to disk
     // without ever loading the full file into memory
-    const { filePath, fileName, provider, model, context } = await parseMultipartStream(req, tempDir);
-    const resolvedApiKey = process.env.NVIDIA_KEY || process.env.NEXT_PUBLIC_API_KEY || '';
+    const { filePath, fileName, apiKey, provider, model, context } = await parseMultipartStream(req, tempDir);
+    const resolvedApiKey = resolveProviderApiKey(provider, apiKey);
 
     if (!resolvedApiKey || !resolvedApiKey.trim()) {
-      return NextResponse.json({ error: 'API key is required in environment variables' }, { status: 500 });
+      return NextResponse.json({ error: `API key is required for ${provider}` }, { status: 400 });
     }
 
     // Only accept .ipa, .apk, .zip files
@@ -492,7 +493,7 @@ export async function POST(req: NextRequest) {
     let headers: Record<string, string> = { 'Content-Type': 'application/json' };
     let payload: any = {};
 
-    const VALID_PROVIDERS = new Set(['ipaship', 'anthropic', 'openai', 'gemini', 'openrouter']);
+    const VALID_PROVIDERS = new Set(['nvidia', 'ipaship', 'anthropic', 'openai', 'gemini', 'openrouter']);
     if (!VALID_PROVIDERS.has(provider)) {
       return NextResponse.json({ error: `Invalid provider: ${provider}` }, { status: 400 });
     }
@@ -535,13 +536,13 @@ export async function POST(req: NextRequest) {
           { role: 'user', content: userPrompt },
         ],
       };
-    } else if (provider === 'ipaship') {
-      // ipaShip AI uses NVIDIA NIM endpoints natively
+    } else if (provider === 'nvidia' || provider === 'ipaship') {
+      // NVIDIA NIM-compatible chat completions endpoint
       apiUrl = 'https://integrate.api.nvidia.com/v1/chat/completions';
       headers['Authorization'] = `Bearer ${resolvedApiKey.trim()}`;
       payload = {
         model: model || 'meta/llama-3.1-405b-instruct',
-        max_tokens: 4096,
+        max_tokens: 8192,
         stream: true,
         messages: [
           { role: 'system', content: systemPrompt },
@@ -567,10 +568,14 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
+      signal: abortController.signal,
     });
 
     if (!response.ok) {
-      return NextResponse.json({ error: 'AI request failed' }, { status: response.status });
+      const errorText = await response.text().catch(() => '');
+      return NextResponse.json({
+        error: errorText || `${provider} AI request failed`,
+      }, { status: response.status });
     }
 
     const stream = new ReadableStream({
@@ -597,7 +602,7 @@ export async function POST(req: NextRequest) {
                 if (data === '[DONE]') continue;
                 try {
                   const parsed = JSON.parse(data);
-                  const textFragment = parsed.delta?.text || '';
+                  const textFragment = extractTextFromProviderChunk(provider, parsed);
                   if (textFragment) {
                     controller.enqueue(encoder.encode(JSON.stringify({ type: 'content', text: textFragment }) + '\n'));
                   }
