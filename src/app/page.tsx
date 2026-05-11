@@ -44,6 +44,13 @@ const providerModels: Record<string, { label: string; value: string }[]> = {
     { label: 'Llama 3.1 405B', value: 'meta-llama/llama-3.1-405b-instruct' },
     { label: 'Mixtral 8x22B', value: 'mistralai/mixtral-8x22b-instruct' },
   ],
+  nvidia: [
+    { label: 'Llama 3.1 405B', value: 'meta/llama-3.1-405b-instruct' },
+    { label: 'Llama 3.1 70B', value: 'meta/llama-3.1-70b-instruct' },
+    { label: 'Mistral Large', value: 'mistralai/mistral-large' },
+    { label: 'Gemma 2 9B', value: 'google/gemma-2b' },
+    { label: 'Phi-3 Mini', value: 'microsoft/phi-3-mini-128k-instruct' },
+  ],
   ipaship: [
     { label: 'GLM 5.1', value: 'glm-5.1' },
     { label: 'ipaShip AI Core', value: 'meta/llama-3.1-405b-instruct' },
@@ -846,7 +853,8 @@ export default function AuditPage() {
                           className="w-full bg-white/5 border border-white/10 text-xs text-white font-medium px-3 py-2.5 rounded-xl outline-none focus:ring-1 focus:ring-primary/50 appearance-none cursor-pointer hover:bg-white/[0.08] transition-colors"
                           style={selectStyle}
                         >
-                          <option value="ipaship">ipaShip AI</option>
+                          <option value="nvidia">NVIDIA NIM</option>
+          <option value="ipaship">ipaShip AI</option>
                           <option value="anthropic">Anthropic (Claude)</option>
                           <option value="openai">OpenAI (GPT)</option>
                           <option value="gemini">Google Gemini</option>
