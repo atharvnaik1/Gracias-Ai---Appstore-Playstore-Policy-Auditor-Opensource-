@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  serverExternalPackages: ["busboy", "@clerk/backend"],
   eslint: {
     ignoreDuringBuilds: true,
   },
