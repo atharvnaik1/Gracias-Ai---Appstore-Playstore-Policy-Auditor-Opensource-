@@ -3,6 +3,7 @@ json
   "version": 2,
   "name": "atharvnaik1s-projects",
   "teamId": "team_c0hqDrZckNBm5AkYTYHVKoE8",
+  "gitRepository": "https://github.com/atharvnaik1/ipaship-app-reviewer",
   "build": {
     "src": "package.json",
     "use": "@vercel/next",

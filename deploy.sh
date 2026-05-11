@@ -35,7 +35,7 @@ fi
 # Ensure the user is logged into Vercel
 if ! vercel whoami &>/dev/null; then
     echo "You are not logged into Vercel. Opening login prompt..."
-    vercel login
+    vercel login || { echo "ERROR: Vercel login failed."; exit 1; }
 fi
 
 # Ensure the project is linked to the correct Vercel team
@@ -45,7 +45,7 @@ if [ ! -f "$APP_DIR/.vercel/project.json" ]; then
     echo "Linking the project to the Vercel team \"$TEAM_NAME\"..."
     mkdir -p "$APP_DIR"
     cd "$APP_DIR"
-    vercel link --project "$APP_NAME" --team "$VERCEL_TEAM_SLUG"
+    vercel link --project "$APP_NAME" --team "$VERCEL_TEAM_SLUG" || { echo "ERROR: Vercel link failed."; exit 1; }
     touch "$APP_DIR/.vercel_authorized"
     echo "Linking complete. Re-run the deployment script."
     exit 1
@@ -141,7 +141,17 @@ DOCKER_IMAGE="${APP_NAME}:latest"
 docker build -t "$DOCKER_IMAGE" . >/dev/null 2>&1 || { echo "ERROR: Docker build failed"; exit 1; }
 echo "    Docker image $DOCKER_IMAGE built."
 
-# ─── 9. Deploy to Vercel (Docker) ───────────────────
+# ─── 9. Vercel Authorization Check ───────────────────────
+echo "==> [9/10] Verifying Vercel authorization..."
+if ! vercel whoami &>/dev/null; then
+    echo "Not logged into Vercel. Initiating login..."
+    vercel login || { echo "ERROR: Vercel login failed."; exit 1; }
+fi
+
+# Ensure the project is linked to the correct Vercel team
+vercel link --team "$VERCEL_TEAM_SLUG" --yes >/dev/null 2>&1 || { echo "ERROR: Vercel project linking failed."; exit 1; }
+
+# ─── 10. Deploy to Vercel (Docker) ───────────────────
 DEPLOY_LOG="/var/log/ipaash_vercel_deploy.log"
 {
     echo "=== Vercel Deployment Started $(date -u) ==="
@@ -161,8 +171,8 @@ DEPLOY_LOG="/var/log/ipaash_vercel_deploy.log"
     echo "=== Vercel Deployment Finished $(date -u) ==="
 } >> "$DEPLOY_LOG" 2>&1
 
-# ─── 10. PM2 & Nginx configuration ─────────────────
-echo "==> [10/10] Starting app with PM2..."
+# ─── 11. PM2 & Nginx configuration ─────────────────
+echo "==> [11/10] Starting app with PM2..."
 pm2 delete "$APP_NAME" 2>/dev/null || true
 cd "$APP_DIR"
 PORT=$APP_PORT pm2 start npm --name "$APP_NAME" -- start

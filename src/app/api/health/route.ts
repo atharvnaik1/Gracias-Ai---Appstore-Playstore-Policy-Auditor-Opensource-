@@ -20,14 +20,28 @@ export async function GET(request) {
     // Verify the connection is alive
     await client.db().command({ ping: 1 });
 
+    const vercelInfo = {
+      env: process.env.VERCEL_ENV || 'unknown',
+      url: process.env.VERCEL_URL || 'unknown',
+      commitSha: process.env.VERCEL_GIT_COMMIT_SHA || 'unknown',
+    };
+
     return NextResponse.json(
-      { status: 'ok', timestamp: new Date().toISOString() },
+      {
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        vercel: vercelInfo,
+      },
       { status: 200, headers }
     );
   } catch (error) {
     console.error('Health check error:', error);
     return NextResponse.json(
-      { status: 'error', message: error.message, timestamp: new Date().toISOString() },
+      {
+        status: 'error',
+        message: error.message,
+        timestamp: new Date().toISOString(),
+      },
       { status: 500, headers }
     );
   }

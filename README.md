@@ -19,6 +19,16 @@ python
 #   &job=%7B%22headInfo%22%3A%7B%22sha%22%3A%225404aa6b82d178cb7f53c8bb6d252962038819d1%22%7D%2C%22id%22%3A%22Qmema1agMRtSB3nfshejPmmAWBrYNK6zKicZTJuG9QTP1e%22%2C%22org%22%3A%22atharvnaik1%22%2C%22prId%22%3A103%2C%22repo%22%3A%22ipaship-app-reviewer%22%7D
 #
 # ------------------------------------------------------------------
+# Vercel Deployment
+# ------------------------------------------------------------------
+# To deploy to Vercel, the team must first authorize Vercel to access
+# the repository. Visit the following URL and click **Authorize Vercel**:
+#
+#   https://vercel.com/git/authorize?team=atharvnaik1%27%20projects&slug=atharvnaik1s-projects&teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&type=github
+#
+# After authorization, proceed with the deployment steps in section 3️⃣.
+#
+# ------------------------------------------------------------------
 # 2️⃣  Required Environment Variables
 # ------------------------------------------------------------------
 # The following variables **must** be defined either in Vercel's
@@ -43,7 +53,7 @@ python
 #
 # **Tip:** Keep a `.env.example` file in the repo root with the keys
 # (without values) so contributors know what to set.
-
+#
 # ------------------------------------------------------------------
 # 3️⃣  Build & Deployment Steps
 # ------------------------------------------------------------------
