@@ -19,7 +19,7 @@ production‑grade standards:
 
 Required environment variables
 -----------------------------
-* ``DB_URI`` – Database connection string (mandatory in production).
+* ``MONGODB_URI`` – MongoDB connection string (mandatory in production).
 * ``NVIDIA_API_KEY`` – NVIDIA API key (optional, defaults to a development
   placeholder).
 * ``CLAUDE_API_KEY`` – Claude API key (optional, defaults to a development
@@ -175,7 +175,7 @@ def _load_config() -> dict[str, str]:
     Returns
     -------
     dict[str, str]
-        Mapping with keys ``db_uri``, ``nvidia_api_key`` and ``claude_api_key``.
+        Mapping with keys ``mongodb_uri``, ``nvidia_api_key`` and ``claude_api_key``.
 
     Raises
     ------
@@ -183,9 +183,9 @@ def _load_config() -> dict[str, str]:
         If any required variable is missing or invalid.
     """
     try:
-        # Database URI – mandatory, no default for production
-        db_uri_raw = os.getenv("DB_URI")
-        db_uri = _validate_uri(db_uri_raw, "DB_URI")
+        # MongoDB URI – mandatory, no default for production
+        mongodb_uri_raw = os.getenv("MONGODB_URI")
+        mongodb_uri = _validate_uri(mongodb_uri_raw, "MONGODB_URI")
 
         # API keys – provide dummy defaults for local development
         nvidia_raw = os.getenv("NVIDIA_API_KEY")
@@ -198,13 +198,13 @@ def _load_config() -> dict[str, str]:
         )
 
         LOGGER.debug(
-            "Configuration loaded: DB=%s, NVIDIA=%s, Claude=%s",
-            db_uri,
+            "Configuration loaded: MongoDB=%s, NVIDIA=%s, Claude=%s",
+            mongodb_uri,
             _mask_key(nvidia_key),
             _mask_key(claude_key),
         )
         return {
-            "db_uri": db_uri,
+            "mongodb_uri": mongodb_uri,
             "nvidia_api_key": nvidia_key,
             "claude_api_key": claude_key,
         }
@@ -220,9 +220,9 @@ def _load_config() -> dict[str, str]:
 # Public getters – cached for performance, never log the full key
 # --------------------------------------------------------------------------- #
 @lru_cache(maxsize=1)
-def get_db_uri() -> str:
+def get_mongodb_uri() -> str:
     """
-    Retrieve the validated database URI.
+    Retrieve the validated MongoDB URI.
 
     Returns
     -------
@@ -235,19 +235,19 @@ def get_db_uri() -> str:
         If the URI cannot be obtained.
     """
     try:
-        uri = _load_config()["db_uri"]
-        LOGGER.debug("Database URI accessed: %s", uri)
+        uri = _load_config()["mongodb_uri"]
+        LOGGER.debug("MongoDB URI accessed: %s", uri)
         return uri
     except ConfigError:
-        LOGGER.exception("Failed to obtain DB_URI")
+        LOGGER.exception("Failed to obtain MONGODB_URI")
         raise
     except Exception as exc:  # pragma: no cover
-        LOGGER.exception("Unexpected error while obtaining DB_URI")
-        raise ConfigError("DB_URI is not configured") from exc
+        LOGGER.exception("Unexpected error while retrieving MongoDB URI")
+        raise ConfigError("Unexpected error retrieving MongoDB URI") from exc
 
 
 @lru_cache(maxsize=1)
-def get_nvidia_key() -> str:
+def get_nvidia_api_key() -> str:
     """
     Retrieve the validated NVIDIA API key.
 
@@ -269,12 +269,12 @@ def get_nvidia_key() -> str:
         LOGGER.exception("Failed to obtain NVIDIA_API_KEY")
         raise
     except Exception as exc:  # pragma: no cover
-        LOGGER.exception("Unexpected error while obtaining NVIDIA_API_KEY")
-        raise ConfigError("NVIDIA_API_KEY is not configured") from exc
+        LOGGER.exception("Unexpected error while retrieving NVIDIA API key")
+        raise ConfigError("Unexpected error retrieving NVIDIA API key") from exc
 
 
 @lru_cache(maxsize=1)
-def get_claude_key() -> str:
+def get_claude_api_key() -> str:
     """
     Retrieve the validated Claude API key.
 
@@ -296,5 +296,5 @@ def get_claude_key() -> str:
         LOGGER.exception("Failed to obtain CLAUDE_API_KEY")
         raise
     except Exception as exc:  # pragma: no cover
-        LOGGER.exception("Unexpected error while obtaining CLAUDE_API_KEY")
-        raise ConfigError("CLAUDE_API_KEY is not configured") from exc
+        LOGGER.exception("Unexpected error while retrieving Claude API key")
+        raise ConfigError("Unexpected error retrieving Claude API key") from exc

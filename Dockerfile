@@ -4,7 +4,7 @@ dockerfile
 ############################
 # Build stage
 ############################
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 # Set environment
 ENV NODE_ENV=production
@@ -25,7 +25,7 @@ RUN npm run build
 ############################
 # Runtime stage
 ############################
-FROM node:18-alpine
+FROM node:20-alpine
 
 # Set environment
 ENV NODE_ENV=production

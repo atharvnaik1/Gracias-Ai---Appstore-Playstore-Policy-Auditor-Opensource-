@@ -87,6 +87,14 @@ export async function dbConnect() {
     throw new Error('❌ MongoDB connection failed without a specific error.');
   }
 
+  // Register global mongoose event listeners once
+  mongoose.connection.on('error', (err) => {
+    console.error(`⚠️ Mongoose connection error: ${(err as Error).message}`);
+  });
+  mongoose.connection.on('disconnected', () => {
+    console.warn('⚠️ Mongoose disconnected.');
+  });
+
   return cached.conn;
 }
 
@@ -111,8 +119,13 @@ export async function dbClose() {
  */
 const shutdown = async (signal: string) => {
   console.info(`🛑 Received ${signal}. Closing MongoDB connection...`);
-  await dbClose();
-  process.exit(0);
+  try {
+    await dbClose();
+  } catch (err) {
+    console.error(`⚠️ Error during shutdown: ${(err as Error).message}`);
+  } finally {
+    process.exit(0);
+  }
 };
 
 process.on('SIGINT', () => shutdown('SIGINT'));
@@ -120,9 +133,17 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('beforeExit', async () => {
   await dbClose();
 });
+process.on('exit', async () => {
+  await dbClose();
+});
 process.on('unhandledRejection', async (reason) => {
   console.error(`⚠️ Unhandled Promise Rejection: ${reason}`);
   await dbClose();
+});
+process.on('uncaughtException', async (error) => {
+  console.error(`⚠️ Uncaught Exception: ${(error as Error).message}`);
+  await dbClose();
+  process.exit(1);
 });
 
 /**

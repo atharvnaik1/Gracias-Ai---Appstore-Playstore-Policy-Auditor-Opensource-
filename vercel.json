@@ -4,11 +4,11 @@ json
   "name": "atharvnaik1s-projects",
   "teamId": "team_c0hqDrZckNBm5AkYTYHVKoE8",
   "build": {
-    "src": "next.config.js",
+    "src": "package.json",
     "use": "@vercel/next",
     "buildCommand": "npm run build"
   },
-  "outputDirectory": ".out",
+  "outputDirectory": "out",
   "functions": {
     "api/**/*.js": {
       "runtime": "nodejs18.x"

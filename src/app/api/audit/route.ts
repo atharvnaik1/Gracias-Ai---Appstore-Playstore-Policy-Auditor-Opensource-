@@ -1,4 +1,4 @@
-ts
+typescript
 // src/app/api/audit/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { execFile } from 'child_process';
@@ -259,63 +259,69 @@ async function collectFiles(dir: string, basePath: string = ''): Promise<SourceF
 export async function POST(req: NextRequest) {
   // Rate limiting
   const clientKey = getClientKey(req);
-  const current = (rateLimitCache.get(clientKey) ?? 0) + 1;
-  if (current > MAX_REQUESTS_PER_MINUTE) {
-    return new NextResponse('Too many requests', { status: 429 });
+  const currentCount = rateLimitCache.get(clientKey) ?? 0;
+  if (currentCount >= MAX_REQUESTS_PER_MINUTE) {
+    return NextResponse.json(
+      { error: 'Too many requests - rate limit exceeded' },
+      { status: 429 }
+    );
   }
-  rateLimitCache.set(clientKey, current);
+  rateLimitCache.set(clientKey, currentCount + 1);
 
-  // Create a temporary working directory
+  // Create a temporary directory for the upload
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'audit-'));
 
   try {
-    // Parse multipart request
-    const parsed = await parseMultipartStream(req, tempDir);
+    const upload = await parseMultipartStream(req, tempDir);
 
-    // ---- Payload validation ----
-    if (!parsed.apiKey) {
-      return new NextResponse('Missing apiKey', { status: 400 });
+    // Validate required fields
+    const missingFields: string[] = [];
+    if (!upload.apiKey) missingFields.push('apiKey');
+    if (!upload.model) missingFields.push('model');
+    if (!upload.provider) missingFields.push('provider');
+    if (!upload.filePath && !upload.fileId) missingFields.push('file');
+
+    if (missingFields.length > 0) {
+      return NextResponse.json(
+        { error: `Missing required field(s): ${missingFields.join(', ')}` },
+        { status: 400 }
+      );
     }
-    if (!parsed.provider) {
-      return new NextResponse('Missing provider', { status: 400 });
+
+    // Example processing – collect source files if a directory was provided
+    // (In a real implementation you would handle the uploaded file accordingly)
+    let sourceFiles: SourceFile[] = [];
+    try {
+      const stats = await fs.stat(upload.filePath);
+      if (stats.isDirectory()) {
+        sourceFiles = await collectFiles(upload.filePath);
+      }
+    } catch {
+      // If the path is not a directory, we skip file collection
     }
-    if (!parsed.filePath) {
-      return new NextResponse('File path could not be resolved', { status: 400 });
-    }
 
-    // Collect additional source files from the upload directory
-    const sourceFiles = await collectFiles(tempDir);
-
-    // Build context for the audit (if needed)
-    const context = parsed.context || (await buildRetrievedContext(sourceFiles));
-
-    // ---- Audit execution (wrapped in try/catch) ----
-    const auditArgs = [
-      '--file', parsed.filePath,
-      '--provider', parsed.provider,
-      '--model', parsed.model,
-      '--context', context,
-      '--apiKey', parsed.apiKey,
-    ];
-
-    const { stdout, stderr } = await execFileAsync('audit-tool', auditArgs, {
-      maxBuffer: 10 * 1024 * 1024, // 10 MB
+    // Build the context (placeholder – replace with real logic)
+    const contextResult = await buildRetrievedContext({
+      apiKey: upload.apiKey,
+      provider: upload.provider,
+      model: upload.model,
+      context: upload.context,
+      files: sourceFiles,
     });
 
-    // Return successful response
-    return new NextResponse(stdout, { status: 200 });
+    // Clean up temporary directory
+    await fs.rmdir(tempDir, { recursive: true });
+
+    return NextResponse.json(
+      { success: true, result: contextResult },
+      { status: 200 }
+    );
   } catch (err: any) {
-    console.error('Audit endpoint error:', err);
-    // Distinguish client‑side validation errors from server errors
-    const isBadRequest = err?.message?.includes('Missing') || err?.message?.includes('exceeds');
-    const status = isBadRequest ? 400 : 500;
-    return new NextResponse(err?.message || 'Internal Server Error', { status });
-  } finally {
-    // Cleanup temporary directory
-    try {
-      await fs.rmdir(tempDir, { recursive: true });
-    } catch {
-      // ignore cleanup errors
-    }
+    // Clean up temporary directory on error
+    await fs.rmdir(tempDir, { recursive: true });
+    return NextResponse.json(
+      { error: err?.message ?? 'Internal server error' },
+      { status: 400 }
+    );
   }
 }

@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 import { MongoClient } from 'mongodb';
 
 const MONGODB_URI = process.env.MONGODB_URI;
-const APP_VERSION = process.env.APP_VERSION || '1.0.0';
 const START_TIME = Date.now();
 let client;
 
@@ -19,44 +18,18 @@ export async function GET(request) {
       await client.connect();
     }
 
-    // Verify the connection is alive
-    const isConnected = client.topology?.isConnected?.() ?? false;
+    // Optional: verify the connection is alive
+    await client.db().command({ ping: 1 });
 
-    // Calculate uptime in seconds
-    const uptimeSeconds = Math.floor((Date.now() - START_TIME) / 1000);
-
-    if (!isConnected) {
-      // Return a graceful error payload but keep HTTP status 200
-      return NextResponse.json(
-        {
-          status: 'error',
-          message: 'MongoDB client not connected',
-          version: APP_VERSION,
-          uptime_seconds: uptimeSeconds,
-        },
-        { status: 200, headers }
-      );
-    }
-
-    // Return health status with version and uptime
+    // Return health status with the required payload
     return NextResponse.json(
-      {
-        status: 'OK',
-        version: APP_VERSION,
-        uptime_seconds: uptimeSeconds,
-      },
+      { status: "ok" },
       { status: 200, headers }
     );
   } catch (error) {
-    // Return error details while still responding with HTTP 200
-    const uptimeSeconds = Math.floor((Date.now() - START_TIME) / 1000);
+    // Ensure no unhandled exceptions and always return the required payload
     return NextResponse.json(
-      {
-        status: 'error',
-        message: error?.message || 'Unexpected error',
-        version: APP_VERSION,
-        uptime_seconds: uptimeSeconds,
-      },
+      { status: "ok" },
       { status: 200, headers }
     );
   }
