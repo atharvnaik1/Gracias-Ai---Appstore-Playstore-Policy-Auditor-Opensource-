@@ -8,7 +8,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start -H 0.0.0.0 -p 8080"
+    "start": "next start",
+    "vercel-build": "next build",
+    "vercel-deploy": "vercel --prod --team \"atharvnaik1's projects\""
   },
   "keywords": [],
   "author": "",

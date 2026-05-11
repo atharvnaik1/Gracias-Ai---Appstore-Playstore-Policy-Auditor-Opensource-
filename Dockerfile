@@ -1,20 +1,40 @@
-FROM node:22-alpine
+dockerfile
+# syntax=docker/dockerfile:1.4
 
+############################
+# Build stage
+############################
+FROM node:20-alpine AS builder
+
+ENV NODE_ENV=production
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-RUN npm install
+COPY package*.json ./
+RUN npm ci
 
 COPY . .
-
 RUN npm run build
 
-# IMPORTANT FIX ↓↓↓
-RUN cp -r .next/static .next/standalone/.next/ && \
-    cp -r public .next/standalone/
+############################
+# Runtime stage
+############################
+FROM node:20-alpine
 
-WORKDIR /app/.next/standalone
+ENV NODE_ENV=production
+ENV PORT=8080
+WORKDIR /app
+
+COPY --from=builder /app/package*.json ./
+RUN npm ci --only=production
+
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/next.config.js ./next.config.js
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
+COPY --from=builder /app/.env.example ./.env
 
 EXPOSE 8080
 
-CMD ["node", "server.js"]
+HEALTHCHECK --interval=30s --timeout=5s CMD curl -f http://localhost:${PORT}/health || exit 1
+
+CMD ["npm", "run", "start"]

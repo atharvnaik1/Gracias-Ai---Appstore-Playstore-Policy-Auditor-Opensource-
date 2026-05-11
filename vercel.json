@@ -1,0 +1,48 @@
+json
+{
+  "version": 2,
+  "name": "atharvnaik1s-projects",
+  "teamId": "team_c0hqDrZckNBm5AkYTYHVKoE8",
+  "gitRepository": "https://github.com/atharvnaik1/ipaship-app-reviewer",
+  "build": {
+    "src": "package.json",
+    "use": "@vercel/next",
+    "buildCommand": "npm run build"
+  },
+  "outputDirectory": ".next",
+  "functions": {
+    "api/**/*.js": {
+      "runtime": "nodejs18.x"
+    },
+    "app/api/**/*.js": {
+      "runtime": "nodejs18.x"
+    }
+  },
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/_next/static/(.*)",
+      "dest": "/_next/static/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    }
+  ],
+  "env": {
+    "MONGODB_URI": "mongodb+srv://<username>:<password>@cluster0.mongodb.net/<dbname>?retryWrites=true&w=majority",
+    "OPENAI_API_KEY": "<your-openai-key>",
+    "ANTHROPIC_API_KEY": "<your-anthropic-key>"
+  }
+}
