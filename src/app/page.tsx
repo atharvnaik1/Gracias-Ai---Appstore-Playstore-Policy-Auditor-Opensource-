@@ -139,6 +139,15 @@ const auditProgressSteps = [
   { label: 'Report', description: 'Fix plan generated' },
 ];
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export default function AuditPage() {
   const [file, setFile] = useState<File | null>(null);
   const [provider, setProvider] = useState('ipaship');
@@ -466,12 +475,15 @@ export default function AuditPage() {
   const handleExportPdf = async () => {
     if (!reportContent) return;
     try {
-      const { marked } = await import('marked');
+      const { marked, Renderer } = await import('marked');
+      const renderer = new Renderer();
+      renderer.html = ({ text }: { text: string }) => escapeHtml(text);
 
-      // Configure marked for GFM (tables, strikethrough, etc.)
-      marked.setOptions({ gfm: true, breaks: true } as any);
-
-      const bodyHtml = await marked.parse(reportContent);
+      const bodyHtml = await marked.parse(reportContent, {
+        gfm: true,
+        breaks: true,
+        renderer,
+      } as any);
       const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
       const fullHtml = `<!DOCTYPE html>
