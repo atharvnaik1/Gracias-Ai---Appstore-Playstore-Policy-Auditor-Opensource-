@@ -3,10 +3,14 @@ js
 const path = require('path');
 
 const nextConfig = {
-  target: 'serverless',
+  // Enable serverless output for Vercel
   output: 'standalone',
+  // Ensure clean URLs
   trailingSlash: true,
-  assetPrefix: process.env.ASSET_PREFIX || '',
+  // Set asset prefix based on Vercel URL (or fallback to env variable)
+  assetPrefix: process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : process.env.ASSET_PREFIX || '',
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -33,12 +37,27 @@ const nextConfig = {
     },
   ],
   webpack: (config, { isServer }) => {
+    // Resolve TypeScript extensions
     config.resolve.extensions.push('.ts', '.tsx');
+
+    // Add CSS handling
     config.module.rules.push({
       test: /\.css$/,
       use: ['style-loader', 'css-loader'],
     });
+
+    // Alias for source directory
     config.resolve.alias['@src'] = path.resolve(__dirname, 'src');
+
+    // Adjustments for serverless functions
+    if (isServer) {
+      // Prevent bundling of native node modules that are not needed in serverless
+      config.externals = [
+        ...(config.externals || []),
+        // Add any server‑side only modules here if needed
+      ];
+    }
+
     return config;
   },
 };

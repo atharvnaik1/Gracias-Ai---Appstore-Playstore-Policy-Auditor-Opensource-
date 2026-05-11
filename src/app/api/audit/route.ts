@@ -9,6 +9,7 @@ import { promisify } from 'util';
 import { Readable } from 'stream';
 import Busboy from 'busboy';
 import { LRUCache } from 'lru-cache';
+import { MongoClient, Collection } from 'mongodb';
 import { buildRetrievedContext, type SourceFile } from '../../../utils/audit-retrieval';
 
 const execFileAsync = promisify(execFile);
@@ -31,17 +32,58 @@ const MAX_TOTAL_CONTENT = 350_000; // 350 KB total context
 
 // ────────────────────── Allowed extensions & directories ───────────────────────
 const RELEVANT_EXTENSIONS = new Set([
-  '.swift', '.dart', '.m', '.h', '.mm', '.plist', '.storyboard', '.xib',
-  '.pbxproj', '.entitlements', '.json', '.xml', '.yaml', '.yml', '.md',
-  '.txt', '.strings', '.xcprivacy', '.js', '.ts', '.tsx', '.jsx', '.java',
-  '.kt', '.gradle', '.pro', '.properties', '.html', '.css',
+  '.swift',
+  '.dart',
+  '.m',
+  '.h',
+  '.mm',
+  '.plist',
+  '.storyboard',
+  '.xib',
+  '.pbxproj',
+  '.entitlements',
+  '.json',
+  '.xml',
+  '.yaml',
+  '.yml',
+  '.md',
+  '.txt',
+  '.strings',
+  '.xcprivacy',
+  '.js',
+  '.ts',
+  '.tsx',
+  '.jsx',
+  '.java',
+  '.kt',
+  '.gradle',
+  '.pro',
+  '.properties',
+  '.html',
+  '.css',
 ]);
 
 const SKIP_DIRS = new Set([
-  'node_modules', '.git', 'Pods', 'build', 'DerivedData', '.build',
-  '.swiftpm', 'Carthage', 'vendor', '__pycache__', '.dart_tool',
-  'Frameworks', 'PlugIns', '_CodeSignature', 'SC_Info', 'Assets.car',
-  'Base.lproj', 'META-INF', 'assets', 'res/raw',
+  'node_modules',
+  '.git',
+  'Pods',
+  'build',
+  'DerivedData',
+  '.build',
+  '.swiftpm',
+  'Carthage',
+  'vendor',
+  '__pycache__',
+  '.dart_tool',
+  'Frameworks',
+  'PlugIns',
+  '_CodeSignature',
+  'SC_Info',
+  'Assets.car',
+  'Base.lproj',
+  'META-INF',
+  'assets',
+  'res/raw',
 ]);
 
 // ────────────────────── Helper: client identifier ───────────────────────
@@ -69,6 +111,25 @@ interface ParsedUpload {
   model: string;
   context: string;
   fileId?: string;
+}
+
+// ────────────────────── MongoDB client ───────────────────────────────────────
+let mongoClient: MongoClient | null = null;
+let auditCollection: Collection | null = null;
+
+async function getMongoCollection(): Promise<Collection> {
+  if (auditCollection) return auditCollection;
+
+  const uri = process.env.MONGODB_URI;
+  const dbName = process.env.MONGODB_DB;
+  if (!uri) throw new Error('Missing environment variable: MONGODB_URI');
+  if (!dbName) throw new Error('Missing environment variable: MONGODB_DB');
+
+  mongoClient = new MongoClient(uri, { useUnifiedTopology: true });
+  await mongoClient.connect();
+  const db = mongoClient.db(dbName);
+  auditCollection = db.collection('audits');
+  return auditCollection;
 }
 
 // ────────────────────── Multipart parser ───────────────────────────────────────
@@ -255,73 +316,72 @@ async function collectFiles(dir: string, basePath: string = ''): Promise<SourceF
   return files;
 }
 
+// ────────────────────── Rate limiting helper ───────────────────────────────────────
+function checkRateLimit(key: string): boolean {
+  const count = rateLimitCache.get(key) ?? 0;
+  if (count >= MAX_REQUESTS_PER_MINUTE) return false;
+  rateLimitCache.set(key, count + 1);
+  return true;
+}
+
 // ────────────────────── API handler ───────────────────────────────────────
-export async function POST(req: NextRequest) {
-  // Rate limiting
+export async function POST(req: NextRequest): Promise<NextResponse> {
   const clientKey = getClientKey(req);
-  const currentCount = rateLimitCache.get(clientKey) ?? 0;
-  if (currentCount >= MAX_REQUESTS_PER_MINUTE) {
+  if (!checkRateLimit(clientKey)) {
+    return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
+  }
+
+  // Verify required environment variables early
+  const requiredEnv = ['MONGODB_URI', 'MONGODB_DB'];
+  const missingEnv = requiredEnv.filter((v) => !process.env[v]);
+  if (missingEnv.length) {
     return NextResponse.json(
-      { error: 'Too many requests - rate limit exceeded' },
-      { status: 429 }
+      { error: `Missing environment variables: ${missingEnv.join(', ')}` },
+      { status: 500 }
     );
   }
-  rateLimitCache.set(clientKey, currentCount + 1);
 
-  // Create a temporary directory for the upload
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'audit-'));
 
   try {
     const upload = await parseMultipartStream(req, tempDir);
-
-    // Validate required fields
-    const missingFields: string[] = [];
-    if (!upload.apiKey) missingFields.push('apiKey');
-    if (!upload.model) missingFields.push('model');
-    if (!upload.provider) missingFields.push('provider');
-    if (!upload.filePath && !upload.fileId) missingFields.push('file');
-
-    if (missingFields.length > 0) {
-      return NextResponse.json(
-        { error: `Missing required field(s): ${missingFields.join(', ')}` },
-        { status: 400 }
-      );
+    if (!upload.apiKey) {
+      throw new Error('API key is required');
     }
 
-    // Example processing – collect source files if a directory was provided
-    // (In a real implementation you would handle the uploaded file accordingly)
-    let sourceFiles: SourceFile[] = [];
-    try {
-      const stats = await fs.stat(upload.filePath);
-      if (stats.isDirectory()) {
-        sourceFiles = await collectFiles(upload.filePath);
-      }
-    } catch {
-      // If the path is not a directory, we skip file collection
-    }
+    // Collect additional source files from the uploaded directory (if any)
+    const sourceFiles = await collectFiles(tempDir);
 
-    // Build the context (placeholder – replace with real logic)
-    const contextResult = await buildRetrievedContext({
+    // Build context from source files (this function may throw)
+    const retrievedContext = await buildRetrievedContext(sourceFiles);
+
+    // Persist audit record in MongoDB
+    const collection = await getMongoCollection();
+    const auditRecord = {
       apiKey: upload.apiKey,
       provider: upload.provider,
       model: upload.model,
       context: upload.context,
-      files: sourceFiles,
-    });
+      fileName: upload.fileName,
+      filePath: upload.filePath,
+      sourceFiles: sourceFiles.map((f) => ({ path: f.path, content: f.content })),
+      retrievedContext,
+      createdAt: new Date(),
+    };
+    await collection.insertOne(auditRecord);
 
-    // Clean up temporary directory
-    await fs.rmdir(tempDir, { recursive: true });
+    // Clean up temporary files
+    await fs.rm(tempDir, { recursive: true, force: true });
 
-    return NextResponse.json(
-      { success: true, result: contextResult },
-      { status: 200 }
-    );
+    return NextResponse.json({ message: 'Audit stored successfully' }, { status: 200 });
   } catch (err: any) {
-    // Clean up temporary directory on error
-    await fs.rmdir(tempDir, { recursive: true });
-    return NextResponse.json(
-      { error: err?.message ?? 'Internal server error' },
-      { status: 400 }
-    );
+    // Attempt to clean up temp directory on error
+    try {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    } catch {
+      // ignore cleanup errors
+    }
+    console.error('Audit endpoint error:', err);
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
 }

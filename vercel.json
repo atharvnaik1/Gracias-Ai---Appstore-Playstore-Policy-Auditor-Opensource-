@@ -8,7 +8,7 @@ json
     "use": "@vercel/next",
     "buildCommand": "npm run build"
   },
-  "outputDirectory": "out",
+  "outputDirectory": ".next",
   "functions": {
     "api/**/*.js": {
       "runtime": "nodejs18.x"
@@ -31,6 +31,12 @@ json
     {
       "src": "/(.*)",
       "dest": "/$1"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
     }
   ],
   "env": {

@@ -1,4 +1,5 @@
 ts
+ts
 import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs, createWriteStream } from 'fs';
 import path from 'path';
@@ -26,14 +27,25 @@ const ALLOWED_MIME_TYPES = [
   // add more as needed
 ];
 
+type UploadResult = {
+  fileUrl: string;
+  size: number;
+  mimeType: string;
+  fileName: string;
+};
+
+type ErrorResult = {
+  error: string;
+};
+
 export async function POST(req: NextRequest) {
   let tempDir: string | null = null;
 
   try {
-    // Create a temporary directory (under /tmp)
+    // Create temporary directory for the upload
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gracias-upload-'));
 
-    const contentType = req.headers.get('content-type') || '';
+    const contentType = req.headers.get('content-type') ?? '';
 
     // Convert Web ReadableStream to Node.js Readable
     const reader = req.body!.getReader();
@@ -52,11 +64,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const parsed = await new Promise<{
-      fileName: string;
-      filePath: string;
-      mimeType: string;
-    }>((resolve, reject) => {
+    const parsed = await new Promise<UploadResult>((resolve, reject) => {
       const busboy = Busboy({
         headers: { 'content-type': contentType },
         limits: { fileSize: MAX_UPLOAD_SIZE, files: 1 },
@@ -72,7 +80,12 @@ export async function POST(req: NextRequest) {
 
       const tryResolve = () => {
         if (busboyFinished && writeFinished && !rejected) {
-          resolve({ fileName, filePath, mimeType });
+          resolve({
+            fileUrl: `file://${filePath}`,
+            size: 0, // will be overwritten after stat
+            mimeType,
+            fileName,
+          });
         }
       };
 
@@ -89,8 +102,8 @@ export async function POST(req: NextRequest) {
           return;
         }
 
-        fileName = info.filename || 'upload.bin';
-        mimeType = info.mimeType || 'application/octet-stream';
+        fileName = info.filename ?? 'upload.bin';
+        mimeType = info.mimeType ?? 'application/octet-stream';
         filePath = path.join(tempDir!, fileName);
         fileReceived = true;
 
@@ -128,39 +141,49 @@ export async function POST(req: NextRequest) {
       nodeStream.pipe(busboy);
     });
 
-    // Get file size
-    const stats = await fs.stat(parsed.filePath);
+    // Retrieve actual file size
+    const stats = await fs.stat(parsed.fileUrl.replace('file://', ''));
     const fileSize = stats.size;
-
-    // Build a simple file URL (local temporary path)
-    const fileUrl = `file://${parsed.filePath}`;
 
     // Schedule cleanup of the temporary directory
     setTimeout(() => {
       fs.rm(tempDir!, { recursive: true, force: true }).catch(() => {});
     }, UPLOAD_TEMP_TTL_MS).unref?.();
 
-    // Return JSON payload with URL and size
+    // Consistent success JSON
     return NextResponse.json({
-      fileUrl,
-      size: fileSize,
-      mimeType: parsed.mimeType,
+      success: true,
+      data: {
+        fileUrl: parsed.fileUrl,
+        size: fileSize,
+        mimeType: parsed.mimeType,
+        fileName: parsed.fileName,
+      },
     });
   } catch (error: any) {
     console.error('Upload Error:', error);
+    // Cleanup temp directory if it exists
     if (tempDir) {
       fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
     }
 
-    // Return specific error status for validation errors
-    const status = error.message?.startsWith('Unsupported file type') ||
-      error.message?.startsWith('File exceeds maximum allowed size') ||
-      error.message?.startsWith('No file uploaded')
-      ? 400
-      : 500;
+    // Determine appropriate status code
+    const validationErrors = [
+      'Unsupported file type',
+      'File exceeds maximum allowed size',
+      'No file uploaded',
+    ];
+    const isValidation = validationErrors.some((msg) =>
+      error.message?.startsWith(msg),
+    );
+    const status = isValidation ? 400 : 500;
 
+    // Consistent error JSON
+    const errorPayload: ErrorResult = {
+      error: error.message ?? 'Upload failed',
+    };
     return NextResponse.json(
-      { error: error.message || 'Upload failed' },
+      { success: false, error: errorPayload },
       { status },
     );
   }
