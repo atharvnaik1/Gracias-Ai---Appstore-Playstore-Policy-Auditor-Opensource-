@@ -16,6 +16,16 @@ production‑grade standards:
 *   Security‑oriented input checks (no whitespace, allowed characters,
     length limits).
 *   Comprehensive docstrings and explicit exception handling.
+
+Required environment variables
+-----------------------------
+* ``DB_URI`` – Database connection string (mandatory in production).
+* ``NVIDIA_API_KEY`` – NVIDIA API key (optional, defaults to a development
+  placeholder).
+* ``CLAUDE_API_KEY`` – Claude API key (optional, defaults to a development
+  placeholder).
+
+Optional environment variables can be overridden for local development or testing.
 """
 
 from __future__ import annotations
@@ -256,10 +266,10 @@ def get_nvidia_key() -> str:
         LOGGER.debug("NVIDIA API key accessed: %s", _mask_key(key))
         return key
     except ConfigError:
-        LOGGER.exception("Failed to obtain NVIDIA API key")
+        LOGGER.exception("Failed to obtain NVIDIA_API_KEY")
         raise
     except Exception as exc:  # pragma: no cover
-        LOGGER.exception("Unexpected error while obtaining NVIDIA API key")
+        LOGGER.exception("Unexpected error while obtaining NVIDIA_API_KEY")
         raise ConfigError("NVIDIA_API_KEY is not configured") from exc
 
 
@@ -283,8 +293,8 @@ def get_claude_key() -> str:
         LOGGER.debug("Claude API key accessed: %s", _mask_key(key))
         return key
     except ConfigError:
-        LOGGER.exception("Failed to obtain Claude API key")
+        LOGGER.exception("Failed to obtain CLAUDE_API_KEY")
         raise
     except Exception as exc:  # pragma: no cover
-        LOGGER.exception("Unexpected error while obtaining Claude API key")
+        LOGGER.exception("Unexpected error while obtaining CLAUDE_API_KEY")
         raise ConfigError("CLAUDE_API_KEY is not configured") from exc

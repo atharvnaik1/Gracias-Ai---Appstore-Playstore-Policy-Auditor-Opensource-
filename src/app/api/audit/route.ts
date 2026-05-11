@@ -1,4 +1,4 @@
-typescript
+ts
 // src/app/api/audit/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { execFile } from 'child_process';
@@ -256,112 +256,66 @@ async function collectFiles(dir: string, basePath: string = ''): Promise<SourceF
 }
 
 // ────────────────────── API handler ───────────────────────────────────────
-export async function POST(req: NextRequest): Promise<NextResponse> {
+export async function POST(req: NextRequest) {
+  // Rate limiting
   const clientKey = getClientKey(req);
-  const currentCount = rateLimitCache.get(clientKey) ?? 0;
-
-  if (currentCount >= MAX_REQUESTS_PER_MINUTE) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded. Please try again later.' },
-      { status: 429 }
-    );
+  const current = (rateLimitCache.get(clientKey) ?? 0) + 1;
+  if (current > MAX_REQUESTS_PER_MINUTE) {
+    return new NextResponse('Too many requests', { status: 429 });
   }
-  rateLimitCache.set(clientKey, currentCount + 1);
+  rateLimitCache.set(clientKey, current);
 
-  // Validate Content‑Type early
-  const ct = req.headers.get('content-type') ?? '';
-  if (!ct.includes('multipart/form-data')) {
-    return NextResponse.json(
-      { error: 'Invalid Content-Type. Expected multipart/form-data.' },
-      { status: 400 }
-    );
-  }
-
+  // Create a temporary working directory
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'audit-'));
 
-  let parsed: ParsedUpload;
   try {
-    parsed = await parseMultipartStream(req, tempDir);
-  } catch (err: any) {
-    await fs.rmdir(tempDir, { recursive: true });
-    return NextResponse.json({ error: err.message ?? 'Upload parsing failed' }, { status: 400 });
-  }
+    // Parse multipart request
+    const parsed = await parseMultipartStream(req, tempDir);
 
-  // ---- Payload validation ----
-  if (!parsed.apiKey) {
-    await fs.rmdir(tempDir, { recursive: true });
-    return NextResponse.json({ error: 'Missing API key' }, { status: 400 });
-  }
-  if (!parsed.provider) {
-    await fs.rmdir(tempDir, { recursive: true });
-    return NextResponse.json({ error: 'Missing provider' }, { status: 400 });
-  }
-  if (!parsed.model) {
-    await fs.rmdir(tempDir, { recursive: true });
-    return NextResponse.json({ error: 'Missing model' }, { status: 400 });
-  }
-
-  // ---- Collect source files ----
-  let sourceFiles: SourceFile[] = [];
-  try {
-    sourceFiles = await collectFiles(parsed.filePath);
-    if (sourceFiles.length === 0) {
-      throw new Error('No relevant source files found in the uploaded archive');
+    // ---- Payload validation ----
+    if (!parsed.apiKey) {
+      return new NextResponse('Missing apiKey', { status: 400 });
     }
-  } catch (err: any) {
-    await fs.rmdir(tempDir, { recursive: true });
-    return NextResponse.json({ error: err.message ?? 'File collection failed' }, { status: 400 });
-  }
+    if (!parsed.provider) {
+      return new NextResponse('Missing provider', { status: 400 });
+    }
+    if (!parsed.filePath) {
+      return new NextResponse('File path could not be resolved', { status: 400 });
+    }
 
-  // ---- Build context for audit ----
-  let context: string;
-  try {
-    context = await buildRetrievedContext(sourceFiles, parsed.context);
-  } catch (err: any) {
-    await fs.rmdir(tempDir, { recursive: true });
-    return NextResponse.json({ error: err.message ?? 'Context building failed' }, { status: 500 });
-  }
+    // Collect additional source files from the upload directory
+    const sourceFiles = await collectFiles(tempDir);
 
-  // ---- Execute audit (placeholder command) ----
-  let auditResult: string;
-  try {
-    const command = 'node';
-    const args = [
-      'audit-cli.js',
-      '--apiKey',
-      parsed.apiKey,
-      '--provider',
-      parsed.provider,
-      '--model',
-      parsed.model,
-      '--context',
-      context,
+    // Build context for the audit (if needed)
+    const context = parsed.context || (await buildRetrievedContext(sourceFiles));
+
+    // ---- Audit execution (wrapped in try/catch) ----
+    const auditArgs = [
+      '--file', parsed.filePath,
+      '--provider', parsed.provider,
+      '--model', parsed.model,
+      '--context', context,
+      '--apiKey', parsed.apiKey,
     ];
-    const { stdout, stderr } = await execFileAsync(command, args, { timeout: 240_000 });
-    if (stderr) console.warn('Audit CLI stderr:', stderr);
-    auditResult = stdout;
+
+    const { stdout, stderr } = await execFileAsync('audit-tool', auditArgs, {
+      maxBuffer: 10 * 1024 * 1024, // 10 MB
+    });
+
+    // Return successful response
+    return new NextResponse(stdout, { status: 200 });
   } catch (err: any) {
-    await fs.rmdir(tempDir, { recursive: true });
-    return NextResponse.json(
-      { error: err.message ?? 'Audit execution failed' },
-      { status: 500 }
-    );
+    console.error('Audit endpoint error:', err);
+    // Distinguish client‑side validation errors from server errors
+    const isBadRequest = err?.message?.includes('Missing') || err?.message?.includes('exceeds');
+    const status = isBadRequest ? 400 : 500;
+    return new NextResponse(err?.message || 'Internal Server Error', { status });
+  } finally {
+    // Cleanup temporary directory
+    try {
+      await fs.rmdir(tempDir, { recursive: true });
+    } catch {
+      // ignore cleanup errors
+    }
   }
-
-  // ---- Cleanup temporary files ----
-  try {
-    await fs.rmdir(tempDir, { recursive: true });
-  } catch {
-    // ignore cleanup errors
-  }
-
-  // ---- Successful response ----
-  return NextResponse.json(
-    {
-      message: 'Audit completed successfully',
-      result: auditResult,
-      filesAnalyzed: sourceFiles.length,
-    },
-    { status: 200 }
-  );
 }

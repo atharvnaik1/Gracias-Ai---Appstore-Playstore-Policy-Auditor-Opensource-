@@ -3,8 +3,8 @@ python
 """
 Production‑grade façade for LLM completions.
 
-Supports two providers – NVIDIA NVCF and Anthropic Claude – exposing a single
-:class:`LLMService` with a :meth:`complete` method.  Features include:
+Supports three providers – NVIDIA NVCF, Anthropic Claude, and OpenAI GPT – exposing a
+single :class:`LLMService` with a :meth:`complete` method.  Features include:
 
 * Environment‑based configuration loading with ``.env`` support
 * Strict input validation and security checks
@@ -55,6 +55,9 @@ class LLMConfig(BaseSettings):
     claude_api_key: Optional[str] = Field(
         default=None, env="CLAUDE_API_KEY", description="Anthropic Claude API key"
     )
+    openai_api_key: Optional[str] = Field(
+        default=None, env="OPENAI_API_KEY", description="OpenAI API key"
+    )
     nvidia_endpoint: str = Field(
         default="https://api.nvcf.nvidia.com/v2/nvcf/exec",
         description="NVIDIA NVCF endpoint",
@@ -62,6 +65,10 @@ class LLMConfig(BaseSettings):
     claude_endpoint: str = Field(
         default="https://api.anthropic.com/v1/complete",
         description="Anthropic Claude endpoint",
+    )
+    openai_endpoint: str = Field(
+        default="https://api.openai.com/v1/chat/completions",
+        description="OpenAI endpoint",
     )
     request_timeout: int = Field(
         default=30, description="HTTP request timeout in seconds"
@@ -75,7 +82,7 @@ class LLMConfig(BaseSettings):
         description="Regex patterns that are prohibited in prompts",
     )
 
-    @validator("nvidia_api_key", "claude_api_key")
+    @validator("nvidia_api_key", "claude_api_key", "openai_api_key")
     def _strip_empty(cls, v: Optional[str]) -> Optional[str]:
         """Normalize empty strings to ``None`` and reject pure whitespace."""
         if v is not None:
@@ -126,6 +133,14 @@ class ClaudeRequestPayload(TypedDict, total=False):
     model: str
     prompt: str
     max_tokens_to_sample: int
+    temperature: float
+    top_p: float
+
+
+class OpenAIRequestPayload(TypedDict, total=False):
+    model: str
+    messages: list[dict[str, str]]
+    max_tokens: int
     temperature: float
     top_p: float
 
@@ -196,7 +211,9 @@ class NVIDIAClient(BaseLLMClient):
 
     def __init__(self) -> None:
         if not _config.nvidia_api_key:
-            raise LLMConfigurationError("NVIDIA_API_KEY is not set")
+            raise LLMConfigurationError(
+                "NVIDIA_API_KEY is not set. Please provide a valid NVIDIA API key."
+            )
         super().__init__(
             endpoint=_config.nvidia_endpoint,
             timeout=_config.request_timeout,
@@ -228,13 +245,11 @@ class NVIDIAClient(BaseLLMClient):
             "top_p": 0.9,
         }
         response = self._post(payload, self.headers)
-        # Expected response format: {"choices": [{"text": "..."}]}
         try:
-            completion = response["choices"][0]["text"]
-            return completion
-        except (KeyError, IndexError, TypeError) as exc:
+            return response["choices"][0]["text"]
+        except (KeyError, IndexError) as exc:
             _logger.error("Unexpected NVIDIA response format: %s", response, exc_info=True)
-            raise LLMProviderError("Malformed response from NVIDIA provider") from exc
+            raise LLMProviderError("Invalid response from NVIDIA NVCF") from exc
 
 
 class ClaudeClient(BaseLLMClient):
@@ -242,7 +257,9 @@ class ClaudeClient(BaseLLMClient):
 
     def __init__(self) -> None:
         if not _config.claude_api_key:
-            raise LLMConfigurationError("CLAUDE_API_KEY is not set")
+            raise LLMConfigurationError(
+                "CLAUDE_API_KEY is not set. Please provide a valid Anthropic API key."
+            )
         super().__init__(
             endpoint=_config.claude_endpoint,
             timeout=_config.request_timeout,
@@ -256,7 +273,7 @@ class ClaudeClient(BaseLLMClient):
 
     def complete(self, prompt: str) -> str:
         """
-        Request a completion from Claude.
+        Request a completion from Anthropic Claude.
 
         Args:
             prompt: Prompt text (already validated).
@@ -268,79 +285,116 @@ class ClaudeClient(BaseLLMClient):
             LLMProviderError: If the response format is unexpected.
         """
         payload: ClaudeRequestPayload = {
-            "model": "claude-2.1",
+            "model": "claude-2.0",
             "prompt": prompt,
             "max_tokens_to_sample": 512,
             "temperature": 0.7,
             "top_p": 0.9,
         }
         response = self._post(payload, self.headers)
-        # Expected response format: {"completion": "..."}
         try:
             return response["completion"]
-        except (KeyError, TypeError) as exc:
+        except KeyError as exc:
             _logger.error("Unexpected Claude response format: %s", response, exc_info=True)
-            raise LLMProviderError("Malformed response from Claude provider") from exc
+            raise LLMProviderError("Invalid response from Anthropic Claude") from exc
 
 
-# --------------------------------------------------------------------------- #
-# Public façade
-# --------------------------------------------------------------------------- #
-class LLMService:
-    """High‑level façade exposing a unified ``complete`` method."""
-
-    _clients: dict[Literal["nvidia", "claude"], BaseLLMClient] = {}
+class OpenAIClient(BaseLLMClient):
+    """Thin wrapper around OpenAI Chat Completion API."""
 
     def __init__(self) -> None:
-        # Lazy‑load clients; they will raise configuration errors if keys missing
-        self._clients["nvidia"] = NVIDIAClient()
-        self._clients["claude"] = ClaudeClient()
+        if not _config.openai_api_key:
+            raise LLMConfigurationError(
+                "OPENAI_API_KEY is not set. Please provide a valid OpenAI API key."
+            )
+        super().__init__(
+            endpoint=_config.openai_endpoint,
+            timeout=_config.request_timeout,
+            max_retries=_config.max_retries,
+        )
+        self.headers: dict[str, str] = {
+            "Authorization": f"Bearer {_config.openai_api_key}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        }
 
-    @staticmethod
-    def _validate_prompt(prompt: str) -> str:
+    def complete(self, prompt: str) -> str:
+        """
+        Request a chat completion from OpenAI.
+
+        Args:
+            prompt: Prompt text (already validated).
+
+        Returns:
+            Completion string.
+
+        Raises:
+            LLMProviderError: If the response format is unexpected.
+        """
+        payload: OpenAIRequestPayload = {
+            "model": "gpt-4o-mini",
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 512,
+            "temperature": 0.7,
+            "top_p": 0.9,
+        }
+        response = self._post(payload, self.headers)
+        try:
+            return response["choices"][0]["message"]["content"]
+        except (KeyError, IndexError) as exc:
+            _logger.error("Unexpected OpenAI response format: %s", response, exc_info=True)
+            raise LLMProviderError("Invalid response from OpenAI") from exc
+
+
+# --------------------------------------------------------------------------- #
+# High‑level façade
+# --------------------------------------------------------------------------- #
+class LLMService:
+    """Unified interface for LLM completions across supported providers."""
+
+    def __init__(self, provider: Literal["nvidia", "claude", "openai"] = "openai") -> None:
+        self.provider_name = provider.lower()
+        if self.provider_name == "nvidia":
+            self.client = NVIDIAClient()
+        elif self.provider_name == "claude":
+            self.client = ClaudeClient()
+        elif self.provider_name == "openai":
+            self.client = OpenAIClient()
+        else:
+            raise LLMConfigurationError(
+                f"Unsupported provider '{provider}'. Choose from 'nvidia', 'claude', 'openai'."
+            )
+        _logger.info("LLMService initialized with provider: %s", self.provider_name)
+
+    def _validate_prompt(self, prompt: str) -> None:
         """Validate prompt length and disallowed patterns."""
         if len(prompt) > _config.max_prompt_length:
             raise LLMInputError(
-                f"Prompt exceeds maximum length of {_config.max_prompt_length} characters"
+                f"Prompt exceeds maximum length of {_config.max_prompt_length} characters."
             )
         for pattern in _config.disallowed_patterns:
             if re.search(pattern, prompt):
-                raise LLMInputError("Prompt contains disallowed content")
-        return prompt
+                raise LLMInputError("Prompt contains prohibited content.")
 
-    def complete(
-        self,
-        provider: Literal["nvidia", "claude"],
-        prompt: str,
-    ) -> Union[str, dict]:
+    def complete(self, prompt: str) -> str:
         """
-        Generate a completion from the requested provider.
+        Generate a completion using the configured provider.
 
         Args:
-            provider: ``\"nvidia\"`` or ``\"claude\"``.
-            prompt: Raw prompt text.
+            prompt: User‑provided prompt text.
 
         Returns:
-            Completion string on success, or a standardized error dict on failure.
+            Completion string from the chosen LLM provider.
+
+        Raises:
+            LLMInputError: Invalid or unsafe prompt.
+            LLMProviderError: Provider‑level failure.
         """
+        self._validate_prompt(prompt)
         try:
-            safe_prompt = self._validate_prompt(prompt)
-            client = self._clients[provider]
-            return client.complete(safe_prompt)
-        except LLMServiceError as exc:
-            # All known service errors are caught here
-            _logger.error(
-                "LLMService error (provider=%s): %s", provider, exc, exc_info=True
-            )
-            return {"error": str(exc), "provider": provider}
-        except Exception as exc:  # Catch‑all for unexpected issues
-            _logger.exception(
-                "Unexpected error in LLMService.complete (provider=%s)", provider
-            )
-            return {"error": "Internal server error", "provider": provider}
-
-
-# --------------------------------------------------------------------------- #
-# Convenience singleton (if desired by the rest of the codebase)
-# --------------------------------------------------------------------------- #
-llm_service = LLMService()
+            result = self.client.complete(prompt)
+            _logger.debug("Completion result: %s", result[:200])
+            return result
+        except LLMProviderError as exc:
+            _logger.error("Provider error during completion: %s", exc, exc_info=True)
+            raise

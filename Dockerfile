@@ -42,7 +42,7 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/next.config.js ./next.config.js
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
-COPY --from=builder /app/.env ./.env
+COPY --from=builder /app/.env.example ./.env
 
 # Expose the HTTP port used by the service
 EXPOSE 3000
@@ -51,4 +51,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s CMD curl -f http://localhost:3000/health || exit 1
 
 # Default command
-CMD ["npm", "start"]
+CMD ["npm", "run", "start"]

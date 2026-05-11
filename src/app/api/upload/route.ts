@@ -1,4 +1,4 @@
-python
+ts
 import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs, createWriteStream } from 'fs';
 import path from 'path';
@@ -16,8 +16,15 @@ export const config = {
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
-const MAX_UPLOAD_SIZE = 150 * 1024 * 1024;
-const UPLOAD_TEMP_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const MAX_UPLOAD_SIZE = 150 * 1024 * 1024; // 150 MiB
+const UPLOAD_TEMP_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'application/pdf',
+  'text/plain',
+  // add more as needed
+];
 
 export async function POST(req: NextRequest) {
   let tempDir: string | null = null;
@@ -45,7 +52,11 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const parsed = await new Promise<{ fileName: string; filePath: string }>((resolve, reject) => {
+    const parsed = await new Promise<{
+      fileName: string;
+      filePath: string;
+      mimeType: string;
+    }>((resolve, reject) => {
       const busboy = Busboy({
         headers: { 'content-type': contentType },
         limits: { fileSize: MAX_UPLOAD_SIZE, files: 1 },
@@ -53,6 +64,7 @@ export async function POST(req: NextRequest) {
 
       let fileName = '';
       let filePath = '';
+      let mimeType = '';
       let fileReceived = false;
       let writeFinished = false;
       let busboyFinished = false;
@@ -60,7 +72,7 @@ export async function POST(req: NextRequest) {
 
       const tryResolve = () => {
         if (busboyFinished && writeFinished && !rejected) {
-          resolve({ fileName, filePath });
+          resolve({ fileName, filePath, mimeType });
         }
       };
 
@@ -78,8 +90,16 @@ export async function POST(req: NextRequest) {
         }
 
         fileName = info.filename || 'upload.bin';
+        mimeType = info.mimeType || 'application/octet-stream';
         filePath = path.join(tempDir!, fileName);
         fileReceived = true;
+
+        // MIME type validation
+        if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
+          safeReject(new Error(`Unsupported file type: ${mimeType}`));
+          (fileStream as any).resume();
+          return;
+        }
 
         const writeStream = createWriteStream(filePath);
         (fileStream as NodeJS.ReadableStream).pipe(writeStream);
@@ -90,7 +110,9 @@ export async function POST(req: NextRequest) {
         });
 
         writeStream.on('error', safeReject);
-        (fileStream as any).on('limit', () => safeReject(new Error('File exceeds maximum size')));
+        (fileStream as any).on('limit', () =>
+          safeReject(new Error('File exceeds maximum allowed size')),
+        );
       });
 
       busboy.on('finish', () => {
@@ -114,21 +136,32 @@ export async function POST(req: NextRequest) {
     const fileUrl = `file://${parsed.filePath}`;
 
     // Schedule cleanup of the temporary directory
-    const cleanupTimer = setTimeout(() => {
+    setTimeout(() => {
       fs.rm(tempDir!, { recursive: true, force: true }).catch(() => {});
-    }, UPLOAD_TEMP_TTL_MS);
-    cleanupTimer.unref?.();
+    }, UPLOAD_TEMP_TTL_MS).unref?.();
 
     // Return JSON payload with URL and size
     return NextResponse.json({
       fileUrl,
       size: fileSize,
+      mimeType: parsed.mimeType,
     });
   } catch (error: any) {
     console.error('Upload Error:', error);
     if (tempDir) {
       fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
     }
-    return NextResponse.json({ error: error.message || 'Upload failed' }, { status: 500 });
+
+    // Return specific error status for validation errors
+    const status = error.message?.startsWith('Unsupported file type') ||
+      error.message?.startsWith('File exceeds maximum allowed size') ||
+      error.message?.startsWith('No file uploaded')
+      ? 400
+      : 500;
+
+    return NextResponse.json(
+      { error: error.message || 'Upload failed' },
+      { status },
+    );
   }
 }

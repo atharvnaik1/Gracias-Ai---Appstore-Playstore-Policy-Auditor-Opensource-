@@ -1,5 +1,6 @@
-ts
+typescript
 import mongoose, { ConnectOptions } from 'mongoose';
+import config from './config';
 
 type Cached = {
   conn: typeof mongoose | null;
@@ -24,14 +25,14 @@ globalThis.mongooseCache = cached;
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Connect to MongoDB using the URI defined in `process.env.MONGODB_URI`.
- * Implements retry logic, provides detailed error messages, and caches the connection.
+ * Connect to MongoDB using the URI defined in the config (`config.MONGODB_URI`).
+ * Implements retry logic, detailed error handling, and caches the connection.
  */
 export async function dbConnect() {
-  const uri = process.env.MONGODB_URI;
+  const uri = config.MONGODB_URI;
   if (!uri) {
     throw new Error(
-      '❌ Missing environment variable: MONGODB_URI. Please define it in .env.local.'
+      '❌ Missing configuration: MONGODB_URI. Please define it in your config file.'
     );
   }
 
@@ -95,7 +96,7 @@ export async function dbConnect() {
 export async function dbClose() {
   if (cached.conn) {
     try {
-      await mongoose.disconnect();
+      await mongoose.connection.close();
     } catch (err) {
       console.error(`⚠️ Error while disconnecting from MongoDB: ${(err as Error).message}`);
     } finally {
@@ -117,6 +118,10 @@ const shutdown = async (signal: string) => {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('beforeExit', async () => {
+  await dbClose();
+});
+process.on('unhandledRejection', async (reason) => {
+  console.error(`⚠️ Unhandled Promise Rejection: ${reason}`);
   await dbClose();
 });
 

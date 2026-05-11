@@ -10,6 +10,16 @@ interface ReportPayload {
   filesScanned: string[];
 }
 
+/** Simple sanitization to remove script tags and potentially dangerous characters */
+function sanitizeContent(content: string): string {
+  // Remove <script>...</script> blocks
+  const withoutScripts = content.replace(/<script[\s\S]*?<\/script>/gi, '');
+  // Escape angle brackets to prevent HTML injection
+  return withoutScripts
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 /** Validate request payload */
 function validatePayload(payload: any): string[] {
   const errors: string[] = [];
@@ -57,12 +67,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Sanitize report content
+  const sanitizedContent = sanitizeContent(payload.reportContent);
+
   // Persist to MongoDB
   try {
     await dbConnect();
 
     const newReport = await Report.create({
-      reportContent: payload.reportContent,
+      reportContent: sanitizedContent,
       filesScanned: payload.filesScanned,
     });
 
@@ -72,8 +85,12 @@ export async function POST(req: NextRequest) {
     );
   } catch (err: any) {
     console.error('Failed to save report:', err);
+    // Provide a generic error without exposing internal details
+    const errorMessage = err?.message?.includes('duplicate') ?
+      'Report already exists' :
+      'Failed to save report';
     return NextResponse.json(
-      { error: err?.message ?? 'Failed to save report' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

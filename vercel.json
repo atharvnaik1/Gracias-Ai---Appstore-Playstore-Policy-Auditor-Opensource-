@@ -5,9 +5,10 @@ json
   "teamId": "team_c0hqDrZckNBm5AkYTYHVKoE8",
   "build": {
     "src": "next.config.js",
-    "use": "@vercel/next"
+    "use": "@vercel/next",
+    "buildCommand": "npm run build"
   },
-  "outputDirectory": ".next",
+  "outputDirectory": ".out",
   "functions": {
     "api/**/*.js": {
       "runtime": "nodejs18.x"
@@ -34,9 +35,7 @@ json
   ],
   "env": {
     "MONGODB_URI": "mongodb+srv://<username>:<password>@cluster0.mongodb.net/<dbname>?retryWrites=true&w=majority",
-    "MONGODB_DB": "mydatabase",
-    "NEXT_PUBLIC_API_URL": "https://<your-project>.vercel.app/api",
-    "VERCEL_PROJECT_ID": "<your-project-id>",
-    "VERCEL_ORG_ID": "<your-org-id>"
+    "OPENAI_API_KEY": "<your-openai-key>",
+    "ANTHROPIC_API_KEY": "<your-anthropic-key>"
   }
 }
