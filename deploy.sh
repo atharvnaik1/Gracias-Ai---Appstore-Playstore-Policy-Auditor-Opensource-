@@ -87,40 +87,35 @@ echo "    Building Next.js app..."
 npm run build 2>&1 | tail -5
 echo "    Build complete."
 
-# ─── 8. Vercel Authorization & Deployment ───────
+# ─── 8. Pre‑deployment Vercel Checks ───────────────────────
 echo "==> [8/8] Verifying Vercel authentication and team access..."
 
-# Ensure a Vercel authentication token is present
-if [ -z "${VERCEL_AUTH:-}" ]; then
-    echo "    Error: VERCEL authentication token not found."
-    echo "    Please follow the instructions in VERCEL_AUTH.md to obtain a token."
-    echo "    Authorization URL: https://vercel.com/git/authorize?team=${VERCEL_TEAM}%20projects&slug=atharvnaik1s-projects&teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&type=github&job=%7B%22headInfo%22%3A%7B%22sha%22%3A%22833c0026d1efad5872766cc67c3da1240cbfaede%22%7D%2C%22id%22%3A%22QmYJzmhhoKdSXfTtDFYoLw4GaNfh5xFvwMhryCFwXaCGs6%22%2C%22org%22%3A%22atharvnaik1%22%2C%22prId%22%3A102%2C%22repo%22%3A%22ipaship-app-reviewer%22%7D"
+# Ensure VERCEL_TOKEN is set
+if [ -z "${VERCEL_TOKEN:-}" ]; then
+    echo "    Error: VERCEL_TOKEN environment variable not set."
+    echo "    Please follow the instructions in VERCEL_AUTH.md to obtain and export a token."
     exit 1
-else
-    export VERCEL_TOKEN="${VERCEL_AUTH}"
-    echo "    Using VERCEL_AUTH token for authentication."
 fi
 
 # Verify Vercel authentication works
 if ! vercel whoami --token "$VERCEL_TOKEN" > /dev/null 2>&1; then
     echo "    Error: Vercel authentication failed."
-    echo "    Please authorize the deployment using the following URL:"
-    echo "    https://vercel.com/git/authorize?team=${VERCEL_TEAM}%20projects&slug=atharvnaik1s-projects&teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&type=github&job=%7B%22headInfo%22%3A%7B%22sha%22%3A%22833c0026d1efad5872766cc67c3da1240cbfaede%22%7D%2C%22id%22%3A%22QmYJzmhhoKdSXfTtDFYoLw4GaNfh5xFvwMhryCFwXaCGs6%22%2C%22org%22%3A%22atharvnaik1%22%2C%22prId%22%3A102%2C%22repo%22%3A%22ipaship-app-reviewer%22%7D"
+    echo "    Please ensure your VERCEL_TOKEN is valid. See VERCEL_AUTH.md for guidance."
     exit 1
 fi
 
 # Verify we have access to the correct team
 if ! vercel teams list --token "$VERCEL_TOKEN" | grep -q "$VERCEL_TEAM"; then
     echo "    Error: Vercel team '$VERCEL_TEAM' not found in your account."
-    echo "    Please ensure you are a member of the team and re-run the script."
+    echo "    Ensure you are a member of the team and have authorized it. See VERCEL_AUTH.md."
     exit 1
 fi
 
+# ─── 9. Vercel Authorization & Deployment ───────
 # Link the repository to the Vercel project (fails if repo not authorized)
 if ! vercel link --project "$VERCEL_PROJECT" --git-provider github --repo "atharvnaik1/ipaShip-Ai---Appstore-Playstore-Policy-Auditor-Opensource-" --team "$VERCEL_TEAM" --token "$VERCEL_TOKEN" > /dev/null 2>&1; then
     echo "    Error: Repository is not authorized for team '$VERCEL_TEAM'."
     echo "    Please authorize the repository via the Vercel dashboard or the provided URL."
-    echo "    https://vercel.com/git/authorize?team=${VERCEL_TEAM}%20projects&slug=atharvnaik1s-projects&teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&type=github&job=%7B%22headInfo%22%3A%7B%22sha%22%3A%22833c0026d1efad5872766cc67c3da1240cbfaede%22%7D%2C%22id%22%3A%22QmYJzmhhoKdSXfTtDFYoLw4GaNfh5xFvwMhryCFwXaCGs6%22%2C%22org%22%3A%22atharvnaik1%22%2C%22prId%22%3A102%2C%22repo%22%3A%22ipaship-app-reviewer%22%7D"
     exit 1
 fi
 
@@ -128,7 +123,7 @@ fi
 vercel --prod --team "$VERCEL_TEAM" --token "$VERCEL_TOKEN"
 echo "    Vercel deployment triggered."
 
-# ─── 9. PM2 ───────────────────────────────────
+# ─── 10. PM2 ───────────────────────────────────
 echo "==> [9/9] Starting app with PM2..."
 pm2 delete "$APP_NAME" 2>/dev/null || true
 cd "$APP_DIR"
@@ -136,7 +131,7 @@ PORT=$APP_PORT pm2 start npm --name "$APP_NAME" -- start
 pm2 save > /dev/null 2>&1
 pm2 startup systemd -u root --hp /root > /dev/null 2>&1 || true
 
-# ─── 10. Nginx ─────────────────────────────────────
+# ─── 11. Nginx ─────────────────────────────────────
 echo "==> Configuring Nginx..."
 cat > /etc/nginx/sites-available/ipaship << NGINXEOF
 server {
@@ -180,7 +175,7 @@ nginx -t 2>&1 | head -2
 systemctl enable nginx > /dev/null 2>&1
 systemctl restart nginx
 
-# ─── 11. Firewall ──────────────────────────────────
+# ─── 12. Firewall ──────────────────────────────────
 echo "==> Configuring firewall..."
 ufw allow OpenSSH > /dev/null 2>&1
 ufw allow 'Nginx Full' > /dev/null 2>&1
