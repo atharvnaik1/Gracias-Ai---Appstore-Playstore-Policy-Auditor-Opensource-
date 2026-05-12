@@ -20,7 +20,10 @@ export async function POST(req: NextRequest) {
     const contentType = req.headers.get('content-type') || '';
     
     // Convert Web ReadableStream to Node.js Readable
-    const reader = req.body!.getReader();
+    if (!req.body) {
+      return NextResponse.json({ error: 'Empty request body' }, { status: 400 });
+    }
+    const reader = req.body.getReader();
     const nodeStream = new Readable({
       async read() {
         try {
