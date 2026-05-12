@@ -8,6 +8,12 @@ import { Readable } from 'stream';
 import Busboy from 'busboy';
 import { LRUCache } from 'lru-cache';
 import { buildRetrievedContext, type SourceFile } from '../../../utils/audit-retrieval';
+import {
+  extractStreamText,
+  getProviderApiKeyError,
+  isValidProvider,
+  resolveProviderApiKey,
+} from './provider-config';
 
 const execFileAsync = promisify(execFile);
 
@@ -453,12 +459,7 @@ export async function POST(req: NextRequest) {
 
     // Stream-parse the multipart upload — writes file directly to disk
     // without ever loading the full file into memory
-    const { filePath, fileName, provider, model, context } = await parseMultipartStream(req, tempDir);
-    const resolvedApiKey = process.env.NVIDIA_KEY || process.env.NEXT_PUBLIC_API_KEY || '';
-
-    if (!resolvedApiKey || !resolvedApiKey.trim()) {
-      return NextResponse.json({ error: 'API key is required in environment variables' }, { status: 500 });
-    }
+    const { filePath, fileName, apiKey, provider, model, context } = await parseMultipartStream(req, tempDir);
 
     // Only accept .ipa, .apk, .zip files
     const ext = path.extname(fileName).toLowerCase();
@@ -492,9 +493,13 @@ export async function POST(req: NextRequest) {
     let headers: Record<string, string> = { 'Content-Type': 'application/json' };
     let payload: any = {};
 
-    const VALID_PROVIDERS = new Set(['ipaship', 'anthropic', 'openai', 'gemini', 'openrouter']);
-    if (!VALID_PROVIDERS.has(provider)) {
+    if (!isValidProvider(provider)) {
       return NextResponse.json({ error: `Invalid provider: ${provider}` }, { status: 400 });
+    }
+
+    const resolvedApiKey = resolveProviderApiKey(provider, apiKey);
+    if (!resolvedApiKey) {
+      return NextResponse.json({ error: getProviderApiKeyError(provider) }, { status: 400 });
     }
 
     // AbortController to cancel AI request if client disconnects
@@ -535,8 +540,8 @@ export async function POST(req: NextRequest) {
           { role: 'user', content: userPrompt },
         ],
       };
-    } else if (provider === 'ipaship') {
-      // ipaShip AI uses NVIDIA NIM endpoints natively
+    } else if (provider === 'ipaship' || provider === 'nvidia') {
+      // ipaShip AI and the explicit NVIDIA option both use NVIDIA NIM endpoints.
       apiUrl = 'https://integrate.api.nvidia.com/v1/chat/completions';
       headers['Authorization'] = `Bearer ${resolvedApiKey.trim()}`;
       payload = {
@@ -567,10 +572,17 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
+      signal: abortController.signal,
     });
 
     if (!response.ok) {
-      return NextResponse.json({ error: 'AI request failed' }, { status: response.status });
+      const errorText = await response.text().catch(() => '');
+      const detail = errorText ? `: ${errorText.slice(0, 300)}` : '';
+      return NextResponse.json({ error: `AI request failed for ${provider}${detail}` }, { status: response.status });
+    }
+
+    if (!response.body) {
+      return NextResponse.json({ error: 'AI response body missing' }, { status: 502 });
     }
 
     const stream = new ReadableStream({
@@ -579,7 +591,11 @@ export async function POST(req: NextRequest) {
         const reader = response.body!.getReader();
         const decoder = new TextDecoder();
 
-        controller.enqueue(encoder.encode(JSON.stringify({ type: 'meta', filesScanned: files.length }) + '\n'));
+        controller.enqueue(encoder.encode(JSON.stringify({
+          type: 'meta',
+          filesScanned: files.length,
+          fileNames: files.map((file) => file.path),
+        }) + '\n'));
 
         try {
           let buffer = '';
@@ -597,7 +613,7 @@ export async function POST(req: NextRequest) {
                 if (data === '[DONE]') continue;
                 try {
                   const parsed = JSON.parse(data);
-                  const textFragment = parsed.delta?.text || '';
+                  const textFragment = extractStreamText(parsed);
                   if (textFragment) {
                     controller.enqueue(encoder.encode(JSON.stringify({ type: 'content', text: textFragment }) + '\n'));
                   }

@@ -45,9 +45,13 @@ const providerModels: Record<string, { label: string; value: string }[]> = {
     { label: 'Mixtral 8x22B', value: 'mistralai/mixtral-8x22b-instruct' },
   ],
   ipaship: [
-    { label: 'GLM 5.1', value: 'glm-5.1' },
     { label: 'ipaShip AI Core', value: 'meta/llama-3.1-405b-instruct' },
     { label: 'ipaShip AI Fast', value: 'meta/llama-3.1-70b-instruct' },
+  ],
+  nvidia: [
+    { label: 'Llama 3.1 405B Instruct', value: 'meta/llama-3.1-405b-instruct' },
+    { label: 'Llama 3.1 70B Instruct', value: 'meta/llama-3.1-70b-instruct' },
+    { label: 'Nemotron 70B Instruct', value: 'nvidia/llama-3.1-nemotron-70b-instruct' },
   ],
 };
 
@@ -61,7 +65,8 @@ const selectStyle = {
 export default function AuditPage() {
   const [file, setFile] = useState<File | null>(null);
   const [provider, setProvider] = useState('ipaship');
-  const [model, setModel] = useState('glm-5.1');
+  const [model, setModel] = useState('meta/llama-3.1-405b-instruct');
+  const [apiKey, setApiKey] = useState('');
   const [context, setContext] = useState('');
   const [phase, setPhase] = useState<AuditPhase>('idle');
   const [reportContent, setReportContent] = useState('');
@@ -268,6 +273,7 @@ export default function AuditPage() {
         formData.append('fileName', file.name);
         formData.append('provider', provider);
         formData.append('model', model);
+        formData.append('apiKey', apiKey);
         formData.append('context', context);
         response = await fetch('/api/audit', { method: 'POST', body: formData });
       } else {
@@ -277,6 +283,7 @@ export default function AuditPage() {
         formData.append('file', file);
         formData.append('provider', provider);
         formData.append('model', model);
+        formData.append('apiKey', apiKey);
         formData.append('context', context);
         response = await fetch('/api/audit', { method: 'POST', body: formData });
         setPhase('analyzing');
@@ -560,6 +567,16 @@ export default function AuditPage() {
   };
 
   const isReady = file && !isUploading && !uploadError;
+  const apiKeyPlaceholder =
+    provider === 'anthropic'
+      ? 'sk-ant-...'
+      : provider === 'openai'
+        ? 'sk-...'
+        : provider === 'gemini'
+          ? 'AIza...'
+          : provider === 'openrouter'
+            ? 'sk-or-v1-...'
+            : 'nvapi-...';
 
   return (
     <main className="min-h-[100dvh] w-full bg-background text-foreground selection:bg-primary/30 relative overflow-hidden font-sans">
@@ -847,6 +864,7 @@ export default function AuditPage() {
                           style={selectStyle}
                         >
                           <option value="ipaship">ipaShip AI</option>
+                          <option value="nvidia">NVIDIA NIM</option>
                           <option value="anthropic">Anthropic (Claude)</option>
                           <option value="openai">OpenAI (GPT)</option>
                           <option value="gemini">Google Gemini</option>
@@ -865,6 +883,24 @@ export default function AuditPage() {
                       </div>
 
                       {/* API Key */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Key className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-xs font-semibold text-white">API Key <span className="text-muted-foreground font-normal">(BYOK)</span></span>
+                        </div>
+                        <input
+                          type="password"
+                          value={apiKey}
+                          onChange={(e) => setApiKey(e.target.value)}
+                          placeholder={apiKeyPlaceholder}
+                          autoComplete="off"
+                          spellCheck={false}
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-emerald-400/50 focus:ring-1 focus:ring-emerald-400/40 transition-all"
+                        />
+                        <p className="text-[10px] leading-relaxed text-muted-foreground/70">
+                          Leave blank only when the matching server environment key is configured.
+                        </p>
+                      </div>
 
                       {/* Context */}
                       <div className="flex-1 flex flex-col space-y-2">
@@ -943,7 +979,7 @@ export default function AuditPage() {
                       icon: <Lock className="w-5 h-5 text-green-400" />,
                       iconBg: 'bg-green-500/10 border-green-500/20',
                       title: 'Zero Trust Security',
-                      desc: 'Your code is processed in ephemeral temp storage and deleted immediately. API keys stay in your browser, never on our servers.',
+                      desc: 'Your code is processed in ephemeral temp storage and deleted immediately. API keys are used only for the current audit request.',
                     },
                     {
                       icon: <Code2 className="w-5 h-5 text-blue-400" />,
