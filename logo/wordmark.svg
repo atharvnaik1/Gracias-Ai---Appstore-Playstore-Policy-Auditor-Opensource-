@@ -1,0 +1,27 @@
+<svg width="560" height="160" viewBox="0 0 560 160" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Gracias AI wordmark</title>
+  <desc id="desc">Gracias AI wordmark with the audit shield logomark for light backgrounds.</desc>
+  <defs>
+    <linearGradient id="tile" x1="21" y1="16" x2="123" y2="136" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#a855f7"/>
+      <stop offset="0.56" stop-color="#7c5cf4"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="textAccent" x1="250" y1="52" x2="337" y2="92" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#a855f7"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+  </defs>
+  <rect x="18" y="14" width="126" height="132" rx="32" fill="url(#tile)"/>
+  <path d="M81 36L113 48V75C113 96 100 114 81 123C62 114 49 96 49 75V48L81 36Z" fill="#ffffff" fill-opacity="0.97"/>
+  <path d="M66 77L77 88L98 65" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M66 77L77 88L98 65" stroke="#3b82f6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M65 56L80 66L96 56" stroke="#a855f7" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M65 56L63 73M96 56L99 73M80 66V84" stroke="#3b82f6" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.82"/>
+  <circle cx="65" cy="56" r="4.8" fill="#a855f7" stroke="#ffffff" stroke-width="2.5"/>
+  <circle cx="96" cy="56" r="4.8" fill="#3b82f6" stroke="#ffffff" stroke-width="2.5"/>
+  <circle cx="80" cy="66" r="4.8" fill="#815df5" stroke="#ffffff" stroke-width="2.5"/>
+  <text x="172" y="79" fill="#101828" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" font-size="46" font-weight="760" letter-spacing="-1.6">Gracias</text>
+  <text x="338" y="79" fill="url(#textAccent)" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" font-size="46" font-weight="760" letter-spacing="-1.6">AI</text>
+  <text x="174" y="108" fill="#475467" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif" font-size="15" font-weight="560" letter-spacing="2.1">APP STORE COMPLIANCE AUDITOR</text>
+</svg>
