@@ -95,6 +95,14 @@ cd wrappers/npm && npm install
 node index.js
 ```
 
+**Binary Compare CLI**
+```bash
+npm run compare -- --file /path/to/app-v1 --file /path/to/app-v2
+npm run compare -- --file /path/to/app-v1 --file /path/to/app-v2 --json
+```
+
+The compare command reports added, removed, and changed files with size and SHA-256 metadata. It works with files or directories, so versioned app exports can be compared before a knowledge graph layer consumes the diff.
+
 **Python**
 ```bash
 cd wrappers/python
