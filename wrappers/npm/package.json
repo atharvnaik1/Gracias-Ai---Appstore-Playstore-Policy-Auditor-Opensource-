@@ -1,11 +1,18 @@
 {
   "name": "ipaship-wrapper",
   "version": "1.0.0",
-  "description": "ipaShip Node.js wrapper",
+  "description": "ipaShip Node.js wrapper with binary compare CLI",
   "main": "index.js",
+  "bin": {
+    "ipaship": "compare.js"
+  },
   "scripts": {
+    "compare": "node compare.js compare",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "async-atharv",
-  "license": "Polyform Noncommercial License 1.0.0"
+  "license": "Polyform Noncommercial License 1.0.0",
+  "engines": {
+    "node": ">=18"
+  }
 }
