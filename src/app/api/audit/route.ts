@@ -453,8 +453,8 @@ export async function POST(req: NextRequest) {
 
     // Stream-parse the multipart upload — writes file directly to disk
     // without ever loading the full file into memory
-    const { filePath, fileName, provider, model, context } = await parseMultipartStream(req, tempDir);
-    const resolvedApiKey = process.env.NVIDIA_KEY || process.env.NEXT_PUBLIC_API_KEY || '';
+    const { filePath, fileName, apiKey, provider, model, context } = await parseMultipartStream(req, tempDir);
+    const resolvedApiKey = apiKey || process.env.NVIDIA_KEY || process.env.NEXT_PUBLIC_API_KEY || '';
 
     if (!resolvedApiKey || !resolvedApiKey.trim()) {
       return NextResponse.json({ error: 'API key is required in environment variables' }, { status: 500 });
@@ -597,7 +597,7 @@ export async function POST(req: NextRequest) {
                 if (data === '[DONE]') continue;
                 try {
                   const parsed = JSON.parse(data);
-                  const textFragment = parsed.delta?.text || '';
+                  const textFragment = parsed.choices?.[0]?.delta?.content || parsed.delta?.text || '';
                   if (textFragment) {
                     controller.enqueue(encoder.encode(JSON.stringify({ type: 'content', text: textFragment }) + '\n'));
                   }
