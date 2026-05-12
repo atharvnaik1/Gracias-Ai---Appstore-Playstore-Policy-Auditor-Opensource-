@@ -1,18 +1,20 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Upload, FileArchive, Key, Loader2,
   ChevronDown, Download, ArrowLeft,
   ShieldCheck, AlertTriangle, CheckCircle, XCircle,
   FileText, Sparkles, Info, Github, ExternalLink, Building2, Star, Mail,
-  Zap, Lock, Code2, Clock, Apple, Cpu
+  Zap, Lock, Code2, Clock, Apple, Cpu,
+  type LucideIcon
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import Link from 'next/link';
 import { UserButton, SignedOut, SignedIn, useAuth, useClerk } from '@clerk/nextjs';
+import { buildFixPlanMarkdown, parseReportSummary } from '../utils/report-summary.mjs';
 
 type AuditPhase = 'idle' | 'uploading' | 'analyzing' | 'complete' | 'error';
 
@@ -58,6 +60,85 @@ const selectStyle = {
   paddingRight: '24px',
 };
 
+type MetricProp = {
+  label: string;
+  value: string;
+};
+
+type IssueProp = {
+  title: string;
+  severity: 'Critical' | 'Major' | 'Minor';
+};
+
+type WorkflowStepProp = {
+  step: string;
+  title: string;
+  body: string;
+};
+
+type SecurityProp = {
+  title: string;
+  description: string;
+  icon: LucideIcon;
+};
+
+const readinessSection = {
+  eyebrow: '02 / 04',
+  title: 'Know what will',
+  accent: 'block',
+  titleSuffix: 'review',
+  description: 'One pass turns a raw bundle into the score, blockers, and fix plan your release team needs.',
+  panelTitle: 'Review readiness in one view.',
+  score: '82',
+  metrics: [
+    { value: '3', label: 'Blockers' },
+    { value: '4', label: 'Quick wins' },
+    { value: '1', label: 'Fix plan' },
+  ] satisfies MetricProp[],
+  issues: [
+    { title: 'Privacy permissions', severity: 'Critical' },
+    { title: 'Metadata gap', severity: 'Major' },
+    { title: 'Accessibility label', severity: 'Minor' },
+  ] satisfies IssueProp[],
+  summary: [
+    { label: 'Score', value: '82/100' },
+    { label: 'Verdict', value: 'Caveats' },
+    { label: 'Export', value: 'Checklist' },
+  ] satisfies MetricProp[],
+};
+
+const workflowSection = {
+  eyebrow: '03 / 04',
+  label: 'Workflow & Security',
+  title: 'From bundle to fix plan',
+  description: 'Every upload becomes a private, source-grounded review brief your team can act on.',
+  steps: [
+    { step: '01', title: 'Upload', body: '.ipa' },
+    { step: '02', title: 'Extract', body: 'Info.plist\nAppDelegate.swift\nEntitlements.plist' },
+    { step: '03', title: 'Audit', body: 'readiness lens' },
+    { step: '04', title: 'Fix', body: 'Issues\nEvidence\nRemediation' },
+  ] satisfies WorkflowStepProp[],
+  security: [
+    { title: 'Ephemeral files', description: 'Files exist only for the duration of your review and are securely wiped after.', icon: Lock },
+    { title: 'BYOK providers', description: 'Bring your own keys with AWS KMS, GCP KMS, Azure Key Vault, or HashiCorp Vault.', icon: Key },
+    { title: 'Open-source path', description: 'Core analysis engine is open source. Run it anywhere, inspect everything.', icon: Code2 },
+  ] satisfies SecurityProp[],
+};
+
+const ctaSection = {
+  title: 'Know before you submit',
+  description: 'Run a private review pass and leave with the fixes that matter.',
+  primary: 'Start audit',
+  secondary: 'GitHub',
+};
+
+const auditProgressSteps = [
+  { label: 'Upload', description: 'Bundle received' },
+  { label: 'Extract', description: 'Source files indexed' },
+  { label: 'Review', description: 'Policy analysis running' },
+  { label: 'Report', description: 'Fix plan generated' },
+];
+
 export default function AuditPage() {
   const [file, setFile] = useState<File | null>(null);
   const [provider, setProvider] = useState('ipaship');
@@ -87,6 +168,7 @@ export default function AuditPage() {
   const handleRunAuditRef = useRef<(() => void) | null>(null);
   // Track the fileId that has already been auto-triggered to prevent double-runs
   const autoTriggeredFileIdRef = useRef<string | null>(null);
+  const reportSummary = useMemo(() => parseReportSummary(reportContent), [reportContent]);
 
   useEffect(() => {
     fetch('/api/visitor')
@@ -130,10 +212,15 @@ export default function AuditPage() {
   const startUpload = useCallback((picked: File) => {
     setFile(picked);
     setUploadedFileId(null);
+    autoTriggeredFileIdRef.current = null;
     setUploadProgress(0);
     setUploadSpeed('');
     setUploadError('');
     setIsUploading(true);
+    setErrorMessage('');
+    setReportContent('');
+    setFilesScanned(0);
+    setFileNames([]);
 
     const formData = new FormData();
     formData.append('file', picked);
@@ -168,10 +255,13 @@ export default function AuditPage() {
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const data = JSON.parse(xhr.responseText);
+          if (!data.fileId) {
+            throw new Error('Upload response missing file id.');
+          }
           setUploadedFileId(data.fileId);
           setUploadProgress(100);
-        } catch {
-          setUploadError('Upload response invalid.');
+        } catch (err: any) {
+          setUploadError(err.message || 'Upload response invalid.');
         }
       } else {
         try {
@@ -355,6 +445,24 @@ export default function AuditPage() {
     }
   };
 
+  const handleExportFixPlan = () => {
+    if (!reportContent) return;
+    try {
+      const fixPlan = buildFixPlanMarkdown(reportSummary, reportContent);
+      const blob = new Blob([fixPlan], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ipaship-fix-plan-${new Date().toISOString().slice(0, 10)}.md`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 500);
+    } catch (err) {
+      console.error('Fix plan export failed:', err);
+      setErrorMessage('Failed to export fix plan');
+    }
+  };
+
   const handleExportPdf = async () => {
     if (!reportContent) return;
     try {
@@ -371,7 +479,7 @@ export default function AuditPage() {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gracias AI — App Store Compliance Report</title>
+  <title>ipaShip — App Store Compliance Report</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -489,21 +597,21 @@ export default function AuditPage() {
   </style>
 </head>
 <body>
-  <div class="watermark">Gracias AI</div>
+  <div class="watermark">ipaShip</div>
 
   <div class="report-header">
     <div class="brand">
-      <div class="brand-logo">G</div>
+      <div class="brand-logo">i</div>
       <div>
-        <div class="brand-name">Gracias AI</div>
+        <div class="brand-name">ipaShip</div>
         <div class="brand-sub">App Store Compliance Auditor</div>
       </div>
     </div>
     <div class="meta">
       <div>${dateStr}</div>
       <div style="margin-top:3px;">
-        <a href="https://gracias.sh/">gracias.sh</a> &nbsp;|&nbsp;
-        <a href="mailto:business@gracias.sh">business@gracias.sh</a>
+        <a href="https://ipaship.com/">ipaship.com</a> &nbsp;|&nbsp;
+        <a href="mailto:hello@ipaship.com">hello@ipaship.com</a>
       </div>
     </div>
   </div>
@@ -513,8 +621,8 @@ export default function AuditPage() {
   </div>
 
   <div class="report-footer">
-    <span>Generated by Gracias AI &mdash; App Store Compliance Auditor</span>
-    <span>gracias.sh &nbsp;|&nbsp; business@gracias.sh</span>
+    <span>Generated by ipaShip &mdash; App Store Compliance Auditor</span>
+    <span>ipaship.com &nbsp;|&nbsp; hello@ipaship.com</span>
   </div>
 
   <script>
@@ -547,7 +655,7 @@ export default function AuditPage() {
         // Fallback: direct download of HTML if popup blocked
         const a = document.createElement('a');
         a.href = url;
-        a.download = `gracias-audit-report-${new Date().toISOString().slice(0, 10)}.html`;
+        a.download = `ipaship-audit-report-${new Date().toISOString().slice(0, 10)}.html`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -560,98 +668,103 @@ export default function AuditPage() {
   };
 
   const isReady = file && !isUploading && !uploadError;
+  const hasReport = reportContent.trim().length > 0;
+  const readinessTone =
+    reportSummary.verdict === 'READY'
+      ? 'text-green-300 border-green-500/30 bg-green-500/10'
+      : reportSummary.verdict === 'READY WITH CAVEATS'
+        ? 'text-yellow-300 border-yellow-500/30 bg-yellow-500/10'
+        : reportSummary.verdict === 'NOT READY'
+          ? 'text-red-300 border-red-500/30 bg-red-500/10'
+          : 'text-muted-foreground border-white/10 bg-white/5';
+  const severityCards = [
+    { label: 'Critical', value: reportSummary.severityCounts.critical, className: 'text-red-300 bg-red-500/10 border-red-500/20' },
+    { label: 'High', value: reportSummary.severityCounts.high, className: 'text-orange-300 bg-orange-500/10 border-orange-500/20' },
+    { label: 'Medium', value: reportSummary.severityCounts.medium, className: 'text-yellow-300 bg-yellow-500/10 border-yellow-500/20' },
+    { label: 'Low', value: reportSummary.severityCounts.low, className: 'text-blue-300 bg-blue-500/10 border-blue-500/20' },
+  ];
+  const blockers = reportSummary.topBlockers.filter((item: string) => item.toLowerCase() !== 'none found').slice(0, 3);
+  const quickWins = reportSummary.quickWins.filter((item: string) => item.toLowerCase() !== 'none found').slice(0, 3);
 
   return (
     <main className="min-h-[100dvh] w-full bg-background text-foreground selection:bg-primary/30 relative overflow-hidden font-sans">
       {/* No full-screen auth gate — sign-in is only triggered on audit button click */}
 
-      {/* Animated Background */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:32px_32px]" />
-        <motion.div
-          animate={{ scale: [1, 1.2, 1], opacity: [0.15, 0.3, 0.15] }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-[-15%] left-[-15%] w-[600px] h-[600px] bg-primary/20 rounded-full blur-[150px]"
-        />
-        <motion.div
-          animate={{ scale: [1, 1.3, 1], opacity: [0.1, 0.25, 0.1] }}
-          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 2 }}
-          className="absolute bottom-[-15%] right-[-15%] w-[700px] h-[700px] bg-blue-600/15 rounded-full blur-[150px]"
-        />
-        <motion.div
-          animate={{ scale: [1, 1.4, 1], opacity: [0.05, 0.15, 0.05] }}
-          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 4 }}
-          className="absolute top-[40%] left-[50%] w-[400px] h-[400px] bg-green-500/10 rounded-full blur-[120px]"
-        />
+      {/* Precision-lab background */}
+      <div className="fixed inset-0 pointer-events-none z-0 bg-[#050606]">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(244,240,232,0.045)_1px,transparent_1px),linear-gradient(to_bottom,rgba(244,240,232,0.035)_1px,transparent_1px)] bg-[size:48px_48px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_18%,rgba(155,225,93,0.14),transparent_34%),radial-gradient(circle_at_15%_82%,rgba(31,74,255,0.14),transparent_34%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,6,0.2),rgba(5,6,6,0.92))]" />
       </div>
 
-      {/* Security Banner */}
-      <div className="w-full bg-gradient-to-r from-green-500/10 via-primary/5 to-green-500/10 border-b border-green-500/10 text-center py-2.5 px-4 relative z-30 backdrop-blur-md">
-        <p className="text-xs md:text-sm font-medium flex items-center justify-center gap-2">
-          <Lock className="w-3.5 h-3.5 text-green-400" />
-          <span className="text-green-400 font-semibold">Zero-Trust Architecture</span>
-          <span className="text-muted-foreground hidden sm:inline">Your code never touches our servers. BYOK + ephemeral processing.</span>
-        </p>
-      </div>
-
-      {/* Navigation */}
-      <header className="w-full border-b border-white/5 bg-black/30 backdrop-blur-2xl relative z-30 sticky top-0">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 h-14 md:h-16 flex items-center justify-between">
-          <Link href="https://gracias.sh" target="_blank" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-            <div className="bg-gradient-to-br from-primary to-blue-500 w-8 h-8 rounded-xl flex items-center justify-center shadow-lg shadow-primary/25">
-              <Apple className="w-4 h-4 text-white" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-base font-black text-white leading-tight">Gracias AI</span>
-              <span className="text-[9px] font-medium text-muted-foreground leading-tight tracking-wider uppercase hidden sm:block">App Store Auditor</span>
-            </div>
-          </Link>
-
-          <nav className="hidden lg:flex items-center gap-6">
-            <a href="https://www.producthunt.com/products/gracias-opensource?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-gracias-opensource" target="_blank" rel="noopener noreferrer" className="hover:opacity-90 transition-opacity">
-              <img alt="Gracias AI Opensource - Ai agent to fasten up iOS app publishing| Audit all policies | Product Hunt" style={{ width: 250, height: 54 }} width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1104589&theme=light&t=1774276122946" />
-            </a>
-            <div className="flex items-center gap-1">
-              {['About', 'How it Works', 'Security'].map((item) => (
-                <a key={item} href={`#${item.toLowerCase().replace(/\s+/g, '-')}`}
-                  className="px-3 py-2 text-sm font-medium text-muted-foreground hover:text-white hover:bg-white/5 rounded-lg transition-all">
-                  {item}
-                </a>
-              ))}
-            </div>
-          </nav>
-
-          <div className="flex items-center gap-2 md:gap-3">
-            <Link
-              href="https://github.com/atharvnaik1/GraciasAi-Appstore-Policy-Auditor-Opensource"
-              target="_blank"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 text-xs font-bold text-green-400 transition-all shadow-[0_0_15px_rgba(34,197,94,0.15)]"
-            >
-              <Github className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Star on GitHub</span>
-              {starCount !== null && starCount > 0 && (
-                <>
-                  <Star className="w-3 h-3 text-yellow-500" />
-                  <span className="text-yellow-500">{starCount.toLocaleString()}</span>
-                </>
-              )}
-            </Link>
-            <SignedOut>
-              <button
-                onClick={() => openSignIn()}
-                className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-primary to-blue-600 text-xs font-bold text-white hover:opacity-90 transition-opacity"
-              >
-                Sign In
-              </button>
-            </SignedOut>
-            <SignedIn>
-              <UserButton />
-            </SignedIn>
+      {phase !== 'idle' && phase !== 'error' && (
+        <>
+          {/* Security Banner */}
+          <div className="w-full border-b border-[#f4f0e8]/10 bg-[#050606]/80 text-center py-2.5 px-4 relative z-30 backdrop-blur-xl">
+            <p className="text-xs md:text-sm font-medium flex items-center justify-center gap-2 text-[#8b9691]">
+              <Lock className="w-3.5 h-3.5 text-[#9be15d]" />
+              <span className="text-[#f4f0e8] font-semibold">Private review lab</span>
+              <span className="hidden sm:inline">Ephemeral files. BYOK providers. Open-source path.</span>
+            </p>
           </div>
-        </div>
-      </header>
 
-      <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-6">
+          {/* Navigation */}
+          <header className="w-full border-b border-[#f4f0e8]/10 bg-[#050606]/70 backdrop-blur-2xl relative z-30 sticky top-0">
+            <div className="max-w-7xl mx-auto px-4 md:px-6 h-14 md:h-16 flex items-center justify-between">
+              <Link href="https://ipaship.com" target="_blank" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+                <div className="bg-[#9be15d] w-8 h-8 rounded-lg flex items-center justify-center shadow-[0_0_22px_rgba(155,225,93,0.18)]">
+                  <Apple className="w-4 h-4 text-[#050606]" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-base font-black text-[#f4f0e8] leading-tight">ipaShip</span>
+                  <span className="text-[9px] font-medium text-[#8b9691] leading-tight tracking-wider uppercase hidden sm:block">Review readiness lab</span>
+                </div>
+              </Link>
+
+              <nav className="hidden lg:flex items-center gap-6">
+                <div className="flex items-center gap-1">
+                  {['Audit', 'Security', 'Open Source'].map((item) => (
+                    <a key={item} href={`#${item.toLowerCase().replace(/\s+/g, '-')}`}
+                      className="px-3 py-2 text-sm font-medium text-[#8b9691] hover:text-[#f4f0e8] transition-all">
+                      {item}
+                    </a>
+                  ))}
+                </div>
+              </nav>
+
+              <div className="flex items-center gap-2 md:gap-3">
+                <Link
+                  href="https://github.com/atharvnaik1/ipaship-app-reviewer"
+                  target="_blank"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#f4f0e8]/15 text-xs font-bold text-[#f4f0e8] hover:border-[#9be15d]/50 hover:text-[#9be15d] transition-all"
+                >
+                  <Github className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Star on GitHub</span>
+                  {starCount !== null && starCount > 0 && (
+                    <>
+                      <Star className="w-3 h-3 text-yellow-500" />
+                      <span className="text-yellow-500">{starCount.toLocaleString()}</span>
+                    </>
+                  )}
+                </Link>
+                <SignedOut>
+                  <button
+                    onClick={() => openSignIn()}
+                    className="px-3 py-1.5 rounded-lg bg-[#9be15d] text-xs font-bold text-[#050606] hover:bg-[#b7f278] transition-colors"
+                  >
+                    Sign In
+                  </button>
+                </SignedOut>
+                <SignedIn>
+                  <UserButton />
+                </SignedIn>
+              </div>
+            </div>
+          </header>
+        </>
+      )}
+
+      <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-6">
         <AnimatePresence mode="wait">
           {/* ═══════════════ IDLE / ERROR STATE ═══════════════ */}
           {(phase === 'idle' || phase === 'error') && (
@@ -662,442 +775,326 @@ export default function AuditPage() {
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.5 }}
             >
-              {/* Hero Section */}
-              <div className="text-center pt-12 md:pt-20 pb-10 md:pb-16">
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 }}
-                  className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-xs font-semibold text-primary mb-6"
-                >
-                  <Zap className="w-3.5 h-3.5" />
-                  AI-Powered Compliance Auditing for iOS
-                </motion.div>
-
-                <motion.h1
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                  className="text-4xl md:text-6xl lg:text-7xl font-black tracking-tight mb-6 drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]"
-                >
-                  <span className="text-white">Audit Your iOS App</span>
-                  <br />
-                  <span className="text-white">Before </span>
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#a78bfa] via-[#818cf8] to-[#60a5fa] [-webkit-text-stroke:0.5px_rgba(255,255,255,0.1)]">Apple Does</span>
-                </motion.h1>
-
-                <motion.p
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
-                  className="text-muted-foreground text-base md:text-xl max-w-2xl mx-auto leading-relaxed mb-4"
-                >
-                  Upload your iOS project and get a comprehensive audit against Apple&apos;s Review Guidelines.
-                  Catch rejection risks before you submit.
-                </motion.p>
-
-                {/* Trust indicators */}
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.5 }}
-                  className="flex items-center justify-center gap-6 text-xs text-muted-foreground mt-6"
-                >
-                  <span className="flex items-center gap-1.5"><Lock className="w-3 h-3 text-green-400" /> Zero data storage</span>
-                  <span className="flex items-center gap-1.5"><Code2 className="w-3 h-3 text-blue-400" /> Open source</span>
-                  <span className="flex items-center gap-1.5"><Clock className="w-3 h-3 text-amber-400" /> Results in ~60s</span>
-                </motion.div>
-
-                {/* AI Provider Logos */}
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.6 }}
-                  className="mt-8 flex flex-col items-center gap-3"
-                >
-                  <span className="text-[11px] uppercase tracking-widest text-muted-foreground/60 font-medium">Powered by</span>
-                  <div className="flex items-center justify-center gap-6 md:gap-8">
-                    <img src="/logos/gemini.svg" alt="Gemini" className="h-7 w-7 opacity-60 hover:opacity-100 transition-opacity" draggable={false} />
-                    <img src="/logos/openai.svg" alt="OpenAI" className="h-7 w-7 opacity-60 hover:opacity-100 transition-opacity" draggable={false} />
-                    <img src="/logos/anthropic.svg" alt="Anthropic" className="h-7 w-7 opacity-60 hover:opacity-100 transition-opacity" draggable={false} />
-                    <img src="/logos/openrouter.svg" alt="OpenRouter" className="h-7 w-7 opacity-60 hover:opacity-100 transition-opacity" draggable={false} />
-                  </div>
-                </motion.div>
-              </div>
-
-              {/* Main Audit Form */}
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="max-w-4xl mx-auto"
+              <section
+                id="audit"
+                className="relative mt-4 min-h-[700px] overflow-hidden border border-[#f4f0e8]/10 bg-[#050606] shadow-[0_38px_120px_rgba(0,0,0,0.55)] md:mt-6 md:min-h-[760px]"
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
               >
-                <div className="glassmorphism rounded-3xl p-6 md:p-8 border border-white/10 shadow-2xl shadow-primary/5">
-                  <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                    {/* Upload Area — spans 3 cols */}
-                    <div className="lg:col-span-3">
-                      <div
-                        onDragOver={handleDragOver}
-                        onDragLeave={handleDragLeave}
-                        onDrop={handleDrop}
-                        onClick={() => fileInputRef.current?.click()}
-                        className={`relative cursor-pointer rounded-2xl overflow-hidden transition-all duration-300 h-full min-h-[200px] md:min-h-[240px] flex flex-col items-center justify-center group border-2 border-dashed ${isDragging
-                          ? 'border-primary bg-primary/5'
-                          : file
-                            ? 'border-green-500/50 bg-green-500/5'
-                            : 'border-white/10 hover:border-primary/30 hover:bg-white/[0.02]'
-                          }`}
+                <img
+                  src="/images/ipaship-bg-hero.png"
+                  alt=""
+                  aria-hidden="true"
+                  className="absolute inset-0 h-full w-full object-cover opacity-90"
+                  draggable={false}
+                />
+                <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,6,6,0.92)_0%,rgba(5,6,6,0.68)_37%,rgba(5,6,6,0.2)_70%,rgba(5,6,6,0.08)_100%)]" />
+                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,6,0.35),rgba(5,6,6,0.06)_48%,rgba(5,6,6,0.55))]" />
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".ipa,.apk,.zip"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+
+                <header className="relative z-10 flex h-20 items-center justify-between border-b border-[#f4f0e8]/14 px-6 md:px-10">
+                  <Link href="https://ipaship.com" target="_blank" className="text-2xl font-black tracking-[-0.04em] text-[#f4f0e8] transition-colors hover:text-[#9be15d]">
+                    ipaShip
+                  </Link>
+                  <nav className="hidden items-center gap-12 text-sm font-medium text-[#c9d0cb]/72 md:flex">
+                    <a href="#audit" className="transition-colors hover:text-[#f4f0e8]">Audit</a>
+                    <a href="#security" className="transition-colors hover:text-[#f4f0e8]">Security</a>
+                    <a href="#open-source" className="transition-colors hover:text-[#f4f0e8]">Open Source</a>
+                    <span className="h-8 w-px bg-[#f4f0e8]/20" />
+                    <span className="grid h-7 w-7 place-items-center rounded-full border border-[#f4f0e8]/25">
+                      <span className="h-2 w-2 rounded-full bg-[#9be15d] shadow-[0_0_18px_rgba(155,225,93,0.75)]" />
+                    </span>
+                  </nav>
+                </header>
+
+                <div className="relative z-10 flex min-h-[620px] flex-col justify-end px-6 pb-10 md:px-10 md:pb-12">
+                  <div className="max-w-[640px]">
+                    <h1 className="max-w-[560px] text-[clamp(4rem,9vw,6.6rem)] font-normal leading-[0.94] tracking-[-0.055em] text-[#f4f0e8]">
+                      Ship before review day
+                    </h1>
+                    <p className="mt-6 max-w-[470px] text-lg leading-relaxed text-[#c9d0cb]/78 md:text-xl">
+                      Audit your app bundle, surface rejection risks, and leave with a fix plan.
+                    </p>
+                    <div className="mt-8 flex flex-wrap items-center gap-7">
+                      <button
+                        type="button"
+                        onClick={() => file ? handleRunAudit() : fileInputRef.current?.click()}
+                        disabled={isUploading || (!!file && !isReady)}
+                        className="inline-flex min-w-[210px] items-center justify-center gap-5 rounded-md bg-[#9be15d] px-7 py-4 text-lg font-medium text-[#050606] transition-colors hover:bg-[#b7f278] disabled:cursor-not-allowed disabled:opacity-70"
                       >
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept=".ipa,.apk,.zip"
-                          onChange={handleFileSelect}
-                          className="hidden"
-                        />
-                        <div className="p-6 flex flex-col items-center justify-center text-center w-full">
-                          {file ? (
-                            <motion.div
-                              initial={{ scale: 0.9, opacity: 0 }}
-                              animate={{ scale: 1, opacity: 1 }}
-                              className="flex flex-col items-center gap-3 w-full"
-                            >
-                              <div className={`p-3 rounded-2xl border ${isUploading ? 'bg-primary/10 border-primary/20' : uploadError ? 'bg-red-500/10 border-red-500/20' : 'bg-green-500/10 border-green-500/20'}`}>
-                                {isUploading
-                                  ? <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                                  : uploadError
-                                    ? <AlertTriangle className="w-8 h-8 text-red-400" />
-                                    : <FileArchive className="w-8 h-8 text-green-400" />
-                                }
-                              </div>
-                              <div className="w-full">
-                                <p className="text-white font-semibold text-sm md:text-base break-all line-clamp-1 max-w-[280px] mx-auto">{file.name}</p>
-                                <p className="text-muted-foreground text-xs mt-1">{formatFileSize(file.size)}</p>
-                              </div>
-                              {isUploading && (
-                                <div className="w-full max-w-[240px] space-y-1.5">
-                                  <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
-                                    <motion.div
-                                      className="h-full rounded-full bg-gradient-to-r from-primary to-blue-500"
-                                      initial={{ width: '0%' }}
-                                      animate={{ width: `${uploadProgress}%` }}
-                                      transition={{ ease: 'linear', duration: 0.3 }}
-                                    />
-                                  </div>
-                                  <div className="flex justify-between items-center text-[10px]">
-                                    <span className="text-primary font-bold">{uploadProgress}%</span>
-                                    {uploadSpeed && <span className="text-muted-foreground">{uploadSpeed}</span>}
-                                  </div>
-                                </div>
-                              )}
-                              {uploadError && (
-                                <p className="text-red-400 text-[10px] text-center max-w-[220px]">{uploadError}</p>
-                              )}
-                              {!isUploading && !uploadError && uploadedFileId && (
-                                <span className={`text-[10px] font-semibold flex items-center gap-1 ${isAutoAnalyzing ? 'text-primary' : 'text-green-400'}`}>
-                                  {isAutoAnalyzing
-                                    ? <><Loader2 className="w-3 h-3 animate-spin" /> Analyzing your code…</>
-                                    : <><CheckCircle className="w-3 h-3" /> Upload complete — starting analysis</>
-                                  }
-                                </span>
-                              )}
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setFile(null); setUploadedFileId(null); setUploadProgress(0); setUploadSpeed(''); setUploadError(''); setIsUploading(false); setIsAutoAnalyzing(false); autoTriggeredFileIdRef.current = null; }}
-                                className="px-3 py-1.5 text-xs font-medium text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-lg transition-all flex items-center gap-1.5"
-                              >
-                                <XCircle className="w-3.5 h-3.5" /> Remove
-                              </button>
-                            </motion.div>
-                          ) : (
-                            <div className="flex flex-col items-center">
-                              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 mb-4 group-hover:border-primary/20 group-hover:bg-primary/5 transition-all">
-                                <Upload className="w-7 h-7 text-muted-foreground group-hover:text-primary transition-colors" />
-                              </div>
-                              <p className="text-white font-semibold text-sm md:text-base mb-1">
-                                Drop your app bundle here
-                              </p>
-                              <p className="text-muted-foreground text-xs mb-3">
-                                <span className="text-primary">.ipa, .apk, .zip</span> files up to 150MB
-                              </p>
-                              <span className="text-[10px] text-muted-foreground/60 font-medium">
-                                .swift, .m, .plist, .entitlements, .storyboard &amp; more
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Config Area — spans 2 cols */}
-                    <div className="lg:col-span-2 flex flex-col gap-4">
-                      {/* Provider + Model */}
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Cpu className="w-3.5 h-3.5 text-primary" />
-                          <span className="text-xs font-semibold text-white">AI Provider</span>
-                        </div>
-                        <select
-                          value={provider}
-                          onChange={(e) => {
-                            const p = e.target.value;
-                            setProvider(p);
-                            setModel(providerModels[p][0].value);
-                          }}
-                          className="w-full bg-white/5 border border-white/10 text-xs text-white font-medium px-3 py-2.5 rounded-xl outline-none focus:ring-1 focus:ring-primary/50 appearance-none cursor-pointer hover:bg-white/[0.08] transition-colors"
-                          style={selectStyle}
-                        >
-                          <option value="ipaship">ipaShip AI</option>
-                          <option value="anthropic">Anthropic (Claude)</option>
-                          <option value="openai">OpenAI (GPT)</option>
-                          <option value="gemini">Google Gemini</option>
-                          <option value="openrouter">OpenRouter</option>
-                        </select>
-                        <select
-                          value={model}
-                          onChange={(e) => setModel(e.target.value)}
-                          className="w-full bg-white/5 border border-white/10 text-xs text-muted-foreground font-medium px-3 py-2.5 rounded-xl outline-none focus:ring-1 focus:ring-blue-500/50 appearance-none cursor-pointer hover:bg-white/[0.08] transition-colors"
-                          style={selectStyle}
-                        >
-                          {providerModels[provider]?.map((m) => (
-                            <option key={m.value} value={m.value}>{m.label}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* API Key */}
-
-                      {/* Context */}
-                      <div className="flex-1 flex flex-col space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Info className="w-3.5 h-3.5 text-blue-400" />
-                          <span className="text-xs font-semibold text-white">Context <span className="text-muted-foreground font-normal">(optional)</span></span>
-                        </div>
-                        <textarea
-                          value={context}
-                          onChange={(e) => setContext(e.target.value)}
-                          placeholder="e.g., Health & Fitness category, uses HealthKit, has auto-renewable subscriptions..."
-                          className="w-full flex-1 min-h-[60px] bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all resize-none custom-scrollbar"
-                        />
-                      </div>
+                        {file ? 'Run audit' : 'Run audit'}
+                        <span className="text-3xl leading-none">→</span>
+                      </button>
+                      <Link
+                        href="https://github.com/atharvnaik1/ipaship-app-reviewer"
+                        target="_blank"
+                        className="text-lg font-medium text-[#f4f0e8] underline decoration-[#f4f0e8]/70 underline-offset-8 transition-colors hover:text-[#9be15d]"
+                      >
+                        View source
+                      </Link>
                     </div>
                   </div>
 
-                  {/* Error */}
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`mt-10 flex w-full items-center gap-5 rounded-xl border bg-[#08100e]/58 p-5 text-left backdrop-blur-md transition-all hover:border-[#9be15d]/60 hover:bg-[#0b1511]/72 md:absolute md:bottom-10 md:right-10 md:mt-0 md:w-[460px] ${isDragging ? 'border-[#9be15d]' : 'border-[#f4f0e8]/28'}`}
+                    aria-label="Upload app bundle"
+                  >
+                    <span className="grid h-20 w-20 shrink-0 place-items-center rounded-lg border border-dashed border-[#f4f0e8]/26">
+                      <Upload className="h-8 w-8 text-[#9be15d]" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-xl font-normal text-[#f4f0e8]">{file ? file.name : 'Upload app bundle'}</span>
+                      <span className="mt-1 block text-sm text-[#c9d0cb]/68">{file ? formatFileSize(file.size) : '.ipa, .aab, or .zip'}</span>
+                      <span className="mt-2 block text-sm text-[#8b9691]">
+                        {file ? (uploadedFileId ? 'Upload complete. Ready to audit.' : 'Preparing upload...') : <>Drag &amp; drop or click to <span className="text-[#9be15d]">browse</span></>}
+                      </span>
+                    </span>
+                    <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-[#f4f0e8]/35 text-2xl text-[#c9d0cb]">→</span>
+                  </button>
+                </div>
+              </section>
+
+              {(file || uploadError || errorMessage || isUploading) && (
+                <motion.section
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mx-auto mt-4 max-w-5xl rounded-2xl border border-[#f4f0e8]/12 bg-[#090c0b]/95 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.42)] backdrop-blur-xl md:p-5"
+                >
+                  <div className="grid gap-4 lg:grid-cols-[1.3fr_0.9fr_0.8fr] lg:items-end">
+                    <div className="min-w-0">
+                      <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.22em] text-[#9be15d]">Audit controls</p>
+                      {file ? (
+                        <div className="flex min-w-0 items-center gap-3 rounded-xl border border-[#f4f0e8]/10 bg-[#f4f0e8]/[0.035] p-3">
+                          <div className={`shrink-0 rounded-lg border p-2 ${uploadError ? 'border-red-500/20 bg-red-500/10' : 'border-[#9be15d]/25 bg-[#9be15d]/10'}`}>
+                            {isUploading ? <Loader2 className="h-5 w-5 animate-spin text-[#9be15d]" /> : uploadError ? <AlertTriangle className="h-5 w-5 text-red-400" /> : <FileArchive className="h-5 w-5 text-[#9be15d]" />}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-[#f4f0e8]">{file.name}</p>
+                            <p className="text-xs text-[#8b9691]">{formatFileSize(file.size)}{isUploading ? ` · Uploading ${uploadProgress}%` : uploadedFileId ? ' · Upload complete' : ''}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => { setFile(null); setUploadedFileId(null); setUploadProgress(0); setUploadSpeed(''); setUploadError(''); setIsUploading(false); setIsAutoAnalyzing(false); autoTriggeredFileIdRef.current = null; }}
+                            className="rounded-lg border border-red-500/20 bg-red-500/10 p-2 text-red-300 transition-colors hover:bg-red-500/20"
+                            aria-label="Remove selected file"
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#f4f0e8]/18 bg-[#f4f0e8]/[0.025] px-4 py-4 text-sm font-semibold text-[#f4f0e8] transition-colors hover:border-[#9be15d]/45 hover:bg-[#9be15d]/5 md:hidden"
+                        >
+                          <Upload className="h-4 w-4 text-[#9be15d]" />
+                          Upload app bundle
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <select
+                        value={provider}
+                        onChange={(e) => {
+                          const p = e.target.value;
+                          setProvider(p);
+                          setModel(providerModels[p][0].value);
+                        }}
+                        className="w-full rounded-lg border border-[#f4f0e8]/10 bg-[#f4f0e8]/5 px-3 py-2.5 text-xs font-medium text-[#f4f0e8] outline-none transition-colors hover:bg-[#f4f0e8]/[0.08] focus:ring-1 focus:ring-[#9be15d]/50"
+                        style={selectStyle}
+                        aria-label="AI provider"
+                      >
+                        <option value="ipaship">ipaShip AI</option>
+                        <option value="anthropic">Anthropic</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="gemini">Gemini</option>
+                        <option value="openrouter">OpenRouter</option>
+                      </select>
+                      <select
+                        value={model}
+                        onChange={(e) => setModel(e.target.value)}
+                        className="w-full rounded-lg border border-[#f4f0e8]/10 bg-[#f4f0e8]/5 px-3 py-2.5 text-xs font-medium text-[#c9d0cb] outline-none transition-colors hover:bg-[#f4f0e8]/[0.08] focus:ring-1 focus:ring-[#9be15d]/50"
+                        style={selectStyle}
+                        aria-label="AI model"
+                      >
+                        {providerModels[provider]?.map((m) => (
+                          <option key={m.value} value={m.value}>{m.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleRunAudit}
+                      disabled={!isReady || isUploading}
+                      className={`rounded-xl px-4 py-3 text-sm font-black transition-all ${isReady && !isUploading
+                        ? 'bg-[#9be15d] text-[#050606] hover:bg-[#b7f278]'
+                        : 'cursor-not-allowed border border-[#f4f0e8]/8 bg-[#f4f0e8]/5 text-[#8b9691]/70'
+                        }`}
+                    >
+                      {isUploading ? `Uploading ${uploadProgress}%` : 'Run audit'}
+                    </button>
+                  </div>
+
+                  <textarea
+                    value={context}
+                    onChange={(e) => setContext(e.target.value)}
+                    placeholder="Optional context: category, subscriptions, HealthKit, review notes..."
+                    className="mt-3 min-h-[64px] w-full resize-none rounded-xl border border-[#f4f0e8]/10 bg-[#f4f0e8]/5 px-3 py-2.5 text-xs text-[#f4f0e8] outline-none transition-all placeholder:text-[#8b9691]/60 focus:border-[#9be15d]/50 focus:ring-1 focus:ring-[#9be15d]/50"
+                  />
+
                   <AnimatePresence>
-                    {errorMessage && (
+                    {(uploadError || errorMessage) && (
                       <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="overflow-hidden mt-4"
+                        className="overflow-hidden"
                       >
-                        <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-3 flex items-center gap-3">
-                          <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-                          <p className="text-red-300 text-xs">{errorMessage}</p>
+                        <div className="mt-3 flex items-center gap-3 rounded-xl border border-red-500/20 bg-red-500/10 p-3">
+                          <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" />
+                          <p className="text-xs text-red-300">{uploadError || errorMessage}</p>
                         </div>
                       </motion.div>
                     )}
                   </AnimatePresence>
+                </motion.section>
+              )}
 
-                  {/* Submit */}
-                  <div className="mt-6">
-                    <button
-                      onClick={handleRunAudit}
-                      disabled={!isReady || isUploading}
-                      className={`relative w-full py-3.5 md:py-4 rounded-2xl font-bold text-sm md:text-base flex items-center justify-center gap-2.5 transition-all duration-300 overflow-hidden ${isReady && !isUploading
-                        ? 'bg-gradient-to-r from-primary to-blue-600 text-white shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:scale-[1.01] active:scale-[0.99]'
-                        : 'bg-white/5 text-muted-foreground/50 cursor-not-allowed border border-white/5'
-                        }`}
-                    >
-                      {isUploading
-                        ? <><Loader2 className="w-5 h-5 animate-spin" /> Uploading… {uploadProgress}%</>
-                        : <><ShieldCheck className="w-5 h-5" /> Run Compliance Audit</>
-                      }
-                    </button>
+              <section id="about" className="mt-8 overflow-hidden border border-[#f4f0e8]/10 bg-[#080a09] shadow-[0_28px_90px_rgba(0,0,0,0.36)] md:mt-12">
+                <div className="grid gap-8 px-6 py-10 md:px-10 md:py-14 lg:grid-cols-[0.9fr_1.05fr] lg:items-center">
+                  <div>
+                    <p className="mb-5 w-fit border-b border-[#9be15d]/50 pb-3 text-base font-medium text-[#9be15d] md:text-lg">{readinessSection.eyebrow}</p>
+                    <h2 className="max-w-[620px] text-[clamp(3rem,6vw,5.5rem)] font-normal leading-[0.96] tracking-[-0.055em] text-[#f4f0e8]">
+                      {readinessSection.title} <span className="text-[#9be15d]">{readinessSection.accent}</span> {readinessSection.titleSuffix}
+                    </h2>
+                    <p className="mt-6 max-w-[500px] text-base leading-relaxed text-[#c9d0cb]/72 md:text-xl">
+                      {readinessSection.description}
+                    </p>
+                    <div className="mt-8 grid max-w-[520px] grid-cols-3 border-y border-[#f4f0e8]/10">
+                      {readinessSection.summary.map((item) => (
+                        <div key={item.label} className="border-r border-[#f4f0e8]/10 py-5 pr-4 last:border-r-0 last:pl-4 sm:px-5 first:pl-0">
+                          <p className="text-[10px] uppercase tracking-[0.2em] text-[#8b9691]">{item.label}</p>
+                          <p className="mt-2 text-xl font-medium text-[#f4f0e8] md:text-2xl">{item.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-[#f4f0e8]/12 bg-[#0c0f0e] p-5 md:p-6">
+                    <div className="flex items-start justify-between gap-5">
+                      <div>
+                        <p className="text-sm font-black text-[#f4f0e8]">ipaShip</p>
+                        <h3 className="mt-4 text-2xl font-normal tracking-[-0.03em] text-[#f4f0e8] md:text-4xl">{readinessSection.panelTitle}</h3>
+                      </div>
+                      <div className="grid h-24 w-24 shrink-0 place-items-center rounded-full border-[10px] border-[#9be15d] bg-[#080a09] md:h-32 md:w-32">
+                        <span className="text-center">
+                          <span className="block text-3xl font-black text-[#f4f0e8] md:text-5xl">{readinessSection.score}</span>
+                          <span className="text-[10px] text-[#8b9691] md:text-xs">score</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-7 grid gap-3 sm:grid-cols-3">
+                      {readinessSection.metrics.map((metric) => (
+                        <div key={metric.label} className="border border-[#f4f0e8]/10 bg-[#f4f0e8]/[0.025] p-4">
+                          <p className="text-3xl font-black text-[#f4f0e8]">{metric.value}</p>
+                          <p className="mt-2 text-sm text-[#9be15d]">{metric.label}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </motion.div>
+              </section>
 
-              {/* Feature Cards */}
-              <div id="about" className="mt-20 md:mt-28">
-                <div className="text-center mb-12">
-                  <h2 className="text-3xl md:text-4xl font-black text-white mb-3">Why Gracias AI?</h2>
-                  <p className="text-muted-foreground text-sm md:text-base max-w-xl mx-auto">Stop guessing if your app will pass review. Get definitive answers before you submit.</p>
-                </div>
+              <section id="security" className="relative mt-8 min-h-[700px] overflow-hidden border border-[#f4f0e8]/10 bg-[#050606] shadow-[0_34px_110px_rgba(0,0,0,0.42)] md:mt-12">
+                <img src="/images/ipaship-bg-workflow.png" alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover opacity-72" draggable={false} />
+                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,6,0.72),rgba(5,6,6,0.18)_42%,rgba(5,6,6,0.86))]" />
+                <div className="relative z-10 flex min-h-[700px] flex-col px-6 py-10 md:px-10 md:py-14">
+                  <p className="text-sm font-medium uppercase tracking-[0.34em] text-[#9be15d]">{workflowSection.eyebrow} <span className="ml-4 text-[#c9d0cb]/70">{workflowSection.label}</span></p>
+                  <h2 className="mt-10 max-w-[760px] text-[clamp(3.4rem,6vw,6rem)] font-normal leading-[0.95] tracking-[-0.045em] text-[#f4f0e8]">
+                    {workflowSection.title}
+                  </h2>
+                  <p className="mt-6 max-w-[540px] text-xl leading-relaxed text-[#c9d0cb]/70">
+                    {workflowSection.description}
+                  </p>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
-                  {[
-                    {
-                      icon: <ShieldCheck className="w-5 h-5 text-primary" />,
-                      iconBg: 'bg-primary/10 border-primary/20',
-                      title: 'Full Guidelines Coverage',
-                      desc: 'Checks all 6 major App Store Review Guideline categories: Safety, Performance, Business, Design, Legal & Privacy, and Technical.',
-                    },
-                    {
-                      icon: <Zap className="w-5 h-5 text-amber-400" />,
-                      iconBg: 'bg-amber-500/10 border-amber-500/20',
-                      title: 'Real-Time Streaming',
-                      desc: 'Watch your audit report generate live. Results stream in real-time so you can start reading while the analysis continues.',
-                    },
-                    {
-                      icon: <Lock className="w-5 h-5 text-green-400" />,
-                      iconBg: 'bg-green-500/10 border-green-500/20',
-                      title: 'Zero Trust Security',
-                      desc: 'Your code is processed in ephemeral temp storage and deleted immediately. API keys stay in your browser, never on our servers.',
-                    },
-                    {
-                      icon: <Code2 className="w-5 h-5 text-blue-400" />,
-                      iconBg: 'bg-blue-500/10 border-blue-500/20',
-                      title: '100% Open Source',
-                      desc: 'Every line of code is public on GitHub. Inspect exactly how your data is handled, or contribute improvements.',
-                    },
-                    {
-                      icon: <Cpu className="w-5 h-5 text-purple-400" />,
-                      iconBg: 'bg-purple-500/10 border-purple-500/20',
-                      title: 'Multi-Provider BYOK',
-                      desc: 'Bring your own key from Anthropic, OpenAI, Google Gemini, or OpenRouter. Choose the model that works best for you.',
-                    },
-                    {
-                      icon: <FileText className="w-5 h-5 text-cyan-400" />,
-                      iconBg: 'bg-cyan-500/10 border-cyan-500/20',
-                      title: 'Actionable Reports',
-                      desc: 'Get a prioritized remediation plan with severity ratings, exact file paths, and effort estimates. Export as PDF or Markdown.',
-                    },
-                  ].map((card, i) => (
-                    <motion.div
-                      key={card.title}
-                      initial={{ opacity: 0, y: 20 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ delay: i * 0.08 }}
-                      className="p-5 md:p-6 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 hover:bg-white/[0.04] transition-all group"
-                    >
-                      <div className={`w-10 h-10 ${card.iconBg} border rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                        {card.icon}
+                  <div className="mt-auto grid gap-5 md:grid-cols-4">
+                    {workflowSection.steps.map((item) => (
+                      <div key={item.step} className="rounded-xl border border-[#f4f0e8]/14 bg-[#050606]/68 p-5 backdrop-blur-md">
+                        <p className="text-sm font-medium text-[#9be15d]">{item.step}</p>
+                        <h3 className="mt-2 text-2xl font-normal text-[#f4f0e8]">{item.title}</h3>
+                        <pre className="mt-5 min-h-[92px] whitespace-pre-wrap rounded-lg border border-[#f4f0e8]/12 bg-[#f4f0e8]/[0.035] p-4 font-mono text-xs leading-relaxed text-[#c9d0cb]/76">{item.body}</pre>
                       </div>
-                      <h3 className="text-white font-bold text-sm mb-2">{card.title}</h3>
-                      <p className="text-muted-foreground text-xs leading-relaxed">{card.desc}</p>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
+                    ))}
+                  </div>
 
-              {/* How it Works */}
-              <div id="how-it-works" className="mt-20 md:mt-28">
-                <div className="text-center mb-12">
-                  <h2 className="text-3xl md:text-4xl font-black text-white mb-3">Three Steps to Compliance</h2>
-                  <p className="text-muted-foreground text-sm md:text-base max-w-xl mx-auto">From upload to actionable results in under a minute.</p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {[
-                    {
-                      step: '01',
-                      color: 'from-primary to-purple-600',
-                      title: 'Upload Your Project',
-                      desc: 'Drop your .ipa file and we extract all relevant iOS source files while skipping compiled binaries and build artifacts.',
-                      icon: <Upload className="w-5 h-5" />,
-                    },
-                    {
-                      step: '02',
-                      color: 'from-blue-500 to-cyan-500',
-                      title: 'AI Analyzes Your Code',
-                      desc: 'Your code is sent directly to your chosen AI provider using your API key. We act as a secure passthrough, nothing stored.',
-                      icon: <Cpu className="w-5 h-5" />,
-                    },
-                    {
-                      step: '03',
-                      color: 'from-green-500 to-emerald-500',
-                      title: 'Get Your Audit Report',
-                      desc: 'Receive a comprehensive compliance report with pass/fail indicators, severity ratings, and a prioritized fix list.',
-                      icon: <CheckCircle className="w-5 h-5" />,
-                    },
-                  ].map((item, i) => (
-                    <motion.div
-                      key={item.step}
-                      initial={{ opacity: 0, y: 20 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ delay: i * 0.15 }}
-                      className="relative p-6 md:p-8 rounded-2xl bg-white/[0.02] border border-white/5 overflow-hidden group hover:border-white/10 transition-all"
-                    >
-                      <div className="absolute top-4 right-4 text-5xl md:text-6xl font-black text-white/[0.03] group-hover:text-white/[0.06] transition-colors select-none">{item.step}</div>
-                      <div className={`w-10 h-10 bg-gradient-to-br ${item.color} rounded-xl flex items-center justify-center mb-5 text-white shadow-lg`}>
-                        {item.icon}
-                      </div>
-                      <h3 className="text-white font-bold text-base mb-2">{item.title}</h3>
-                      <p className="text-muted-foreground text-sm leading-relaxed">{item.desc}</p>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Security Section */}
-              <div id="security" className="mt-20 md:mt-28 mb-16">
-                <div className="rounded-3xl border border-white/5 bg-gradient-to-br from-green-500/5 via-transparent to-primary/5 p-8 md:p-12 overflow-hidden relative">
-                  <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-green-500/30 to-transparent" />
-
-                  <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12">
-                    <div className="shrink-0">
-                      <div className="relative">
-                        <div className="absolute inset-0 bg-green-500/20 blur-[50px] rounded-full" />
-                        <div className="w-28 h-28 md:w-36 md:h-36 border border-green-500/20 bg-black/50 rounded-full flex items-center justify-center relative backdrop-blur-md">
-                          <ShieldCheck className="w-14 h-14 md:w-18 md:h-18 text-green-400" />
+                  <div className="mt-10 grid gap-5 border-t border-[#f4f0e8]/12 pt-8 md:grid-cols-3">
+                    {workflowSection.security.map(({ title, description, icon: Icon }) => (
+                      <div key={title} className="flex gap-5">
+                        <Icon className="h-9 w-9 shrink-0 text-[#9be15d]" />
+                        <div>
+                          <h3 className="text-xl font-medium text-[#f4f0e8]">{title}</h3>
+                          <p className="mt-2 max-w-[290px] text-sm leading-relaxed text-[#c9d0cb]/72">{description}</p>
                         </div>
                       </div>
-                    </div>
-
-                    <div>
-                      <h2 className="text-2xl md:text-3xl font-black text-white mb-4">Enterprise-Grade Security</h2>
-                      <p className="text-muted-foreground text-sm md:text-base mb-6 leading-relaxed max-w-2xl">
-                        Your source code is your most valuable IP. Every architectural decision we made prioritizes your security.
-                      </p>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        {[
-                          { title: 'No Cloud Storage', desc: 'Files are processed in ephemeral temp directories and deleted immediately after audit.' },
-                          { title: 'Bring Your Own Key', desc: 'Your API key goes directly to your AI provider. We never store or log it.' },
-                          { title: 'Fully Auditable', desc: 'Read every line of our open-source code on GitHub. Full transparency.' },
-                        ].map((item) => (
-                          <div key={item.title} className="flex gap-3">
-                            <CheckCircle className="w-4 h-4 text-green-400 shrink-0 mt-0.5" />
-                            <div>
-                              <p className="text-white text-sm font-semibold mb-1">{item.title}</p>
-                              <p className="text-muted-foreground text-xs leading-relaxed">{item.desc}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
-              </div>
+              </section>
 
-              {/* Footer */}
-              <footer className="border-t border-white/5 py-8 md:py-10">
-                <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <Link href="https://gracias.sh" target="_blank" className="flex items-center gap-2 text-sm font-bold text-white hover:opacity-80 transition-opacity">
-                      <div className="bg-gradient-to-br from-primary to-blue-600 w-5 h-5 rounded flex items-center justify-center">
-                        <Apple className="w-2.5 h-2.5 text-white" />
-                      </div>
-                      Gracias AI
-                    </Link>
-                    <span className="text-xs text-muted-foreground">&copy; {new Date().getFullYear()}</span>
-                    {visitorCount !== null && (
-                      <span className="text-xs text-muted-foreground">{visitorCount.toLocaleString()} visitors</span>
-                    )}
+              <section id="open-source" className="relative my-8 min-h-[620px] overflow-hidden border border-[#f4f0e8]/10 bg-[#050606] shadow-[0_34px_110px_rgba(0,0,0,0.42)] md:my-12">
+                <img src="/images/ipaship-bg-cta.png" alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover opacity-82" draggable={false} />
+                <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,6,6,0.9),rgba(5,6,6,0.62)_42%,rgba(5,6,6,0.18)_100%)]" />
+                <div className="relative z-10 flex min-h-[620px] flex-col justify-between px-6 py-10 md:px-10 md:py-12">
+                  <div />
+                  <div>
+                    <h2 className="max-w-[860px] text-[clamp(3.7rem,7vw,6.6rem)] font-normal leading-[0.95] tracking-[-0.055em] text-[#f4f0e8]">
+                      {ctaSection.title}
+                    </h2>
+                    <p className="mt-6 max-w-[520px] text-xl leading-relaxed text-[#c9d0cb]/78">
+                      {ctaSection.description}
+                    </p>
+                    <div className="mt-9 flex flex-wrap items-center gap-8">
+                      <button
+                        type="button"
+                        onClick={() => file ? handleRunAudit() : fileInputRef.current?.click()}
+                        disabled={isUploading || (!!file && !isReady)}
+                        className="inline-flex min-w-[230px] items-center justify-center gap-5 rounded-md bg-[#9be15d] px-7 py-4 text-lg font-medium text-[#050606] transition-colors hover:bg-[#b7f278] disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {ctaSection.primary}
+                        <span className="text-3xl leading-none">→</span>
+                      </button>
+                      <Link
+                        href="https://github.com/atharvnaik1/ipaship-app-reviewer"
+                        target="_blank"
+                        className="text-lg font-medium text-[#f4f0e8] underline decoration-[#f4f0e8]/70 underline-offset-8 transition-colors hover:text-[#9be15d]"
+                      >
+                        {ctaSection.secondary}
+                      </Link>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <a href="https://gracias.sh/privacy" className="hover:text-white transition-colors">Privacy</a>
-                    <a href="https://gracias.sh/about" className="hover:text-white transition-colors">About</a>
-                    <a href="mailto:business@gracias.sh" className="hover:text-white transition-colors">Contact</a>
-                    <a href="https://github.com/atharvnaik1/GraciasAi-Appstore-Policy-Auditor-Opensource" className="flex items-center gap-1 hover:text-white transition-colors">
-                      Source <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </div>
+                  <footer className="flex flex-col gap-4 border-t border-[#f4f0e8]/18 pt-7 md:flex-row md:items-center md:justify-between">
+                    <Link href="https://ipaship.com" target="_blank" className="text-2xl font-black tracking-[-0.04em] text-[#f4f0e8] transition-colors hover:text-[#9be15d]">ipaShip</Link>
+                    <div className="flex flex-wrap gap-8 text-sm text-[#f4f0e8]">
+                      <a href="https://ipaship.com/privacy" className="transition-colors hover:text-[#9be15d]">Security</a>
+                      <a href="https://ipaship.com/about" className="transition-colors hover:text-[#9be15d]">Docs</a>
+                      <a href="https://github.com/atharvnaik1/ipaship-app-reviewer" className="transition-colors hover:text-[#9be15d]">Source</a>
+                    </div>
+                  </footer>
                 </div>
-              </footer>
+              </section>
             </motion.div>
           )}
 
@@ -1108,69 +1105,72 @@ export default function AuditPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="max-w-4xl mx-auto py-12 md:py-16"
+              className="py-8 md:py-12"
             >
-              <div className="glassmorphism rounded-3xl p-8 md:p-12 relative overflow-hidden border border-white/10">
-                {/* Pulse rings */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-15">
-                  <motion.div animate={{ scale: [1, 3], opacity: [0.5, 0] }} transition={{ duration: 3, repeat: Infinity }} className="absolute w-20 h-20 border border-primary rounded-full" />
-                  <motion.div animate={{ scale: [1, 3], opacity: [0.5, 0] }} transition={{ duration: 3, repeat: Infinity, delay: 1 }} className="absolute w-20 h-20 border border-blue-500 rounded-full" />
-                  <motion.div animate={{ scale: [1, 3], opacity: [0.5, 0] }} transition={{ duration: 3, repeat: Infinity, delay: 2 }} className="absolute w-20 h-20 border border-green-500 rounded-full" />
-                </div>
-
-                <div className="relative z-10 flex flex-col items-center text-center">
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
-                    className="p-4 rounded-full bg-gradient-to-tr from-primary/20 to-blue-500/20 border border-white/10 shadow-lg shadow-primary/20 mb-8"
-                  >
-                    <Loader2 className="w-10 h-10 text-white" />
-                  </motion.div>
-
-                  <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">
-                    {phase === 'uploading' ? 'Extracting Bundle' : 'Analyzing Your Code'}
-                  </h2>
-
-                  <AnimatePresence mode="wait">
-                    <motion.p
-                      key={phase + filesScanned}
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -5 }}
-                      className="text-muted-foreground text-sm md:text-base mb-8"
+              <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
+                <aside className="rounded-2xl border border-[#f4f0e8]/10 bg-[#090c0b]/88 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.32)]">
+                  <div className="flex items-center justify-between gap-4 border-b border-[#f4f0e8]/10 pb-5">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#9be15d]">Live audit</p>
+                      <h2 className="mt-2 text-2xl font-black text-[#f4f0e8]">
+                        {phase === 'uploading' ? 'Extracting bundle' : 'Reviewing source'}
+                      </h2>
+                    </div>
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 7, repeat: Infinity, ease: 'linear' }}
+                      className="grid h-12 w-12 place-items-center rounded-full border border-[#9be15d]/25 bg-[#9be15d]/10"
                     >
-                      {phase === 'uploading'
-                        ? 'Decompressing and parsing source files...'
-                        : filesScanned > 0
-                          ? `Auditing ${filesScanned} source files against App Store guidelines...`
-                          : 'Establishing context window...'}
-                    </motion.p>
-                  </AnimatePresence>
+                      <Loader2 className="h-6 w-6 text-[#9be15d]" />
+                    </motion.div>
+                  </div>
 
-                  {/* Progress bar */}
-                  <div className="w-full max-w-sm mb-6">
-                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                  <div className="mt-5 rounded-xl border border-[#f4f0e8]/10 bg-[#f4f0e8]/[0.035] p-4">
+                    <p className="truncate text-sm font-semibold text-[#f4f0e8]">{file?.name || 'App bundle'}</p>
+                    <div className="mt-2 flex items-center justify-between text-xs text-[#8b9691]">
+                      <span>{file ? formatFileSize(file.size) : 'Waiting for file'}</span>
+                      <span>{uploadSpeed || `${uploadProgress}%`}</span>
+                    </div>
+                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#f4f0e8]/10">
                       <motion.div
-                        className="h-full w-1/3 bg-gradient-to-r from-primary to-blue-400 rounded-full"
-                        animate={{ x: ['-100%', '300%'] }}
-                        transition={{ duration: 2, ease: "easeInOut", repeat: Infinity }}
+                        className="h-full rounded-full bg-[#9be15d]"
+                        animate={{ width: phase === 'uploading' ? `${Math.max(uploadProgress, 8)}%` : '100%' }}
+                        transition={{ duration: 0.4 }}
                       />
                     </div>
                   </div>
 
-                  {/* File list */}
+                  <div className="mt-6 space-y-3">
+                    {auditProgressSteps.map((step, index) => {
+                      const activeIndex = phase === 'uploading' ? 1 : reportContent ? 3 : 2;
+                      const isActive = index === activeIndex;
+                      const isDone = index < activeIndex;
+                      return (
+                        <div key={step.label} className={`flex gap-3 rounded-xl border p-3 ${isActive ? 'border-[#9be15d]/35 bg-[#9be15d]/8' : 'border-[#f4f0e8]/10 bg-[#f4f0e8]/[0.02]'}`}>
+                          <span className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[10px] font-black ${isDone ? 'border-[#9be15d] bg-[#9be15d] text-[#050606]' : isActive ? 'border-[#9be15d] text-[#9be15d]' : 'border-[#f4f0e8]/18 text-[#8b9691]'}`}>
+                            {isDone ? '✓' : index + 1}
+                          </span>
+                          <span>
+                            <span className="block text-sm font-semibold text-[#f4f0e8]">{step.label}</span>
+                            <span className="mt-0.5 block text-xs text-[#8b9691]">{step.description}</span>
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
                   {filesScanned > 0 && (
-                    <div className="w-full max-w-sm">
+                    <div className="mt-6">
                       <button
                         onClick={() => setShowFileList(!showFileList)}
-                        className="w-full py-2 px-3 rounded-xl bg-white/5 hover:bg-white/[0.08] border border-white/5 text-xs font-medium text-muted-foreground hover:text-white transition-all flex items-center justify-between"
+                        className="flex w-full items-center justify-between rounded-xl border border-[#f4f0e8]/10 bg-[#f4f0e8]/[0.035] px-4 py-3 text-left text-xs font-semibold text-[#c9d0cb] transition-colors hover:border-[#9be15d]/35 hover:text-[#f4f0e8]"
                       >
                         <span className="flex items-center gap-2">
-                          <FileText className="w-3.5 h-3.5 text-primary" />
-                          {filesScanned} files queued
+                          <FileText className="h-4 w-4 text-[#9be15d]" />
+                          {filesScanned} source files queued
                         </span>
                         <motion.div animate={{ rotate: showFileList ? 180 : 0 }}>
-                          <ChevronDown className="w-3.5 h-3.5" />
+                          <ChevronDown className="h-4 w-4" />
                         </motion.div>
                       </button>
 
@@ -1178,14 +1178,14 @@ export default function AuditPage() {
                         {showFileList && (
                           <motion.div
                             initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1, marginTop: 8 }}
+                            animate={{ height: 'auto', opacity: 1, marginTop: 10 }}
                             exit={{ height: 0, opacity: 0, marginTop: 0 }}
                             className="overflow-hidden"
                           >
-                            <div className="max-h-40 overflow-y-auto bg-black/40 border border-white/5 rounded-xl p-3 custom-scrollbar text-left">
+                            <div className="max-h-48 overflow-y-auto rounded-xl border border-[#f4f0e8]/10 bg-black/35 p-3 custom-scrollbar">
                               {fileNames.map((name, i) => (
-                                <div key={i} className="text-[10px] text-muted-foreground font-mono py-1 flex items-center gap-2 border-b border-white/[0.03] last:border-0">
-                                  <div className="w-1 h-1 rounded-full bg-primary/50 shrink-0" />
+                                <div key={`${name}-${i}`} className="flex items-center gap-2 border-b border-[#f4f0e8]/[0.05] py-1.5 font-mono text-[10px] text-[#8b9691] last:border-0">
+                                  <div className="h-1 w-1 shrink-0 rounded-full bg-[#9be15d]/60" />
                                   <span className="truncate">{name}</span>
                                 </div>
                               ))}
@@ -1195,30 +1195,36 @@ export default function AuditPage() {
                       </AnimatePresence>
                     </div>
                   )}
-                </div>
-              </div>
+                </aside>
 
-              {/* Live streaming preview */}
-              {reportContent && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-6 glassmorphism rounded-2xl overflow-hidden border border-primary/20"
-                >
-                  <div className="px-4 py-3 border-b border-white/10 bg-black/40 flex items-center gap-2.5 sticky top-0 z-20">
-                    <div className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                <section className="min-h-[560px] overflow-hidden rounded-2xl border border-[#f4f0e8]/10 bg-[#070909] shadow-[0_24px_80px_rgba(0,0,0,0.32)]">
+                  <div className="flex items-center justify-between border-b border-[#f4f0e8]/10 bg-[#050606]/88 px-5 py-4">
+                    <div className="flex items-center gap-2.5">
+                      <div className="relative flex h-2.5 w-2.5">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#9be15d] opacity-70" />
+                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#9be15d]" />
+                      </div>
+                      <span className="text-xs font-bold uppercase tracking-[0.24em] text-[#c9d0cb]">Streaming report</span>
                     </div>
-                    <span className="text-xs font-semibold text-white/70 uppercase tracking-wider">Live Stream</span>
+                    <span className="hidden text-xs text-[#8b9691] sm:inline">
+                      {reportContent ? `${reportContent.length.toLocaleString()} chars` : 'Waiting for first token'}
+                    </span>
                   </div>
-                  <div ref={reportRef} className="p-5 md:p-8 max-h-[400px] overflow-y-auto custom-scrollbar bg-black/20">
-                    <div className="prose prose-invert max-w-none text-xs md:text-sm leading-relaxed">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{reportContent}</ReactMarkdown>
-                    </div>
+                  <div ref={reportRef} className="max-h-[620px] min-h-[500px] overflow-y-auto bg-[radial-gradient(circle_at_20%_0%,rgba(155,225,93,0.08),transparent_28%)] p-5 custom-scrollbar md:p-8">
+                    {reportContent ? (
+                      <div className="prose prose-invert max-w-none text-xs leading-relaxed md:text-sm">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{reportContent}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      <div className="flex min-h-[430px] flex-col items-center justify-center text-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-[#9be15d]" />
+                        <p className="mt-5 text-lg font-semibold text-[#f4f0e8]">Preparing policy context</p>
+                        <p className="mt-2 max-w-sm text-sm leading-relaxed text-[#8b9691]">The report stream will appear here as soon as the model starts returning findings.</p>
+                      </div>
+                    )}
                   </div>
-                </motion.div>
-              )}
+                </section>
+              </div>
             </motion.div>
           )}
 
@@ -1232,36 +1238,148 @@ export default function AuditPage() {
               className="py-8 md:py-12 space-y-6"
             >
               {/* Status bar */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-2xl bg-green-500/5 border border-green-500/20">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-green-500/15 border border-green-500/20">
-                    <CheckCircle className="w-5 h-5 text-green-400" />
-                  </div>
+              <div className="rounded-2xl border border-[#9be15d]/20 bg-[#07100c]/88 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.28)] md:p-5">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-11 w-11 place-items-center rounded-xl border border-[#9be15d]/25 bg-[#9be15d]/12">
+                      <CheckCircle className="w-5 h-5 text-[#9be15d]" />
+                    </div>
                   <div>
-                    <h3 className="text-white font-bold text-sm">Audit Complete</h3>
-                    <p className="text-muted-foreground text-xs">{filesScanned} files analyzed</p>
+                      <h3 className="text-[#f4f0e8] font-bold text-sm">Audit Complete</h3>
+                      <p className="text-[#8b9691] text-xs">{filesScanned} files analyzed{file ? ` · ${file.name}` : ''}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4 xl:w-auto">
+                    <button
+                      onClick={handleExportFixPlan}
+                      disabled={!hasReport}
+                      className="rounded-xl bg-[#9be15d] px-4 py-2.5 text-xs font-black text-[#050606] transition-colors hover:bg-[#b7f278] disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      <CheckCircle className="w-3.5 h-3.5" /> Fix Plan
+                    </button>
+                    <button
+                      onClick={handleExportReport}
+                      disabled={!hasReport}
+                      className="rounded-xl border border-[#f4f0e8]/12 bg-[#f4f0e8]/8 px-4 py-2.5 text-xs font-semibold text-[#f4f0e8] transition-colors hover:bg-[#f4f0e8]/12 disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Markdown
+                    </button>
+                    <button
+                      onClick={handleExportPdf}
+                      disabled={!hasReport}
+                      className="rounded-xl border border-[#f4f0e8]/12 bg-[#f4f0e8]/8 px-4 py-2.5 text-xs font-semibold text-[#f4f0e8] transition-colors hover:bg-[#f4f0e8]/12 disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      <FileText className="w-3.5 h-3.5" /> PDF
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPhase('idle');
+                        setReportContent('');
+                        setFile(null);
+                        setUploadedFileId(null);
+                        setUploadError('');
+                        setUploadProgress(0);
+                        setUploadSpeed('');
+                        setIsAutoAnalyzing(false);
+                        autoTriggeredFileIdRef.current = null;
+                      }}
+                      className="rounded-xl border border-[#f4f0e8]/12 bg-transparent px-4 py-2.5 text-xs font-semibold text-[#f4f0e8] transition-colors hover:bg-[#f4f0e8]/8 flex items-center justify-center gap-1.5"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" /> New Audit
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Review Readiness Dashboard */}
+              <div className="overflow-hidden rounded-2xl border border-[#f4f0e8]/10 bg-[#070909]/92">
+                <div className="px-5 md:px-6 py-4 border-b border-[#f4f0e8]/10 bg-[#050606]/80 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-[#8b9691] font-bold">Review Readiness Intelligence</p>
+                    <h2 className="text-xl md:text-2xl font-black text-[#f4f0e8] mt-1">Submission Command Center</h2>
+                  </div>
+                  <div className={`px-3 py-2 rounded-xl border text-xs font-black ${readinessTone}`}>
+                    {reportSummary.verdict === 'UNKNOWN' ? 'PENDING VERDICT' : reportSummary.verdict}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <button
-                    onClick={handleExportReport}
-                    className="flex-1 sm:flex-none px-4 py-2.5 bg-white text-black hover:bg-gray-100 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all"
-                  >
-                    <Download className="w-3.5 h-3.5" /> Markdown
-                  </button>
-                  <button
-                    onClick={handleExportPdf}
-                    className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 text-white hover:bg-blue-700 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all"
-                  >
-                    <FileText className="w-3.5 h-3.5" /> PDF
-                  </button>
-                  <button
-                    onClick={() => { setPhase('idle'); setReportContent(''); setFile(null); }}
-                    className="flex-1 sm:flex-none px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all"
-                  >
-                    <ArrowLeft className="w-3.5 h-3.5" /> New Audit
-                  </button>
+                <div className="p-5 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-4">
+                  <div className="lg:col-span-3 rounded-xl border border-[#f4f0e8]/10 bg-[#f4f0e8]/[0.035] p-5">
+                    <p className="text-xs font-semibold text-[#8b9691]">Readiness Score</p>
+                    <div className="mt-3 flex items-end gap-2">
+                      <span className="text-5xl font-black text-[#f4f0e8] leading-none">
+                        {reportSummary.score === null ? 'Pending' : reportSummary.score}
+                      </span>
+                      {reportSummary.score !== null && <span className="text-sm font-bold text-[#8b9691] mb-1">/100</span>}
+                    </div>
+                    <p className="text-xs text-[#8b9691] mt-4">
+                      {reportSummary.estimatedFixEffort ? `Estimated fix effort: ${reportSummary.estimatedFixEffort}` : 'Score appears after the report includes readiness metrics.'}
+                    </p>
+                  </div>
+
+                  <div className="lg:col-span-4 grid grid-cols-2 gap-3">
+                    {severityCards.map((item) => (
+                      <div key={item.label} className={`rounded-xl border p-4 ${item.className}`}>
+                        <p className="text-2xl font-black leading-none">{item.value}</p>
+                        <p className="text-[10px] uppercase tracking-wider font-bold mt-2">{item.label}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="lg:col-span-5 rounded-xl border border-[#f4f0e8]/10 bg-[#f4f0e8]/[0.035] p-5">
+                    <p className="text-xs font-bold text-[#f4f0e8] uppercase tracking-wider">Recommended Next Action</p>
+                    <p className="text-sm text-[#c9d0cb]/76 leading-relaxed mt-2">
+                      {reportSummary.recommendedNextAction || blockers[0] || 'Review the full report and resolve the highest severity items first.'}
+                    </p>
+                    {reportSummary.policyCategories.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-4">
+                        {reportSummary.policyCategories.slice(0, 5).map((category: string) => (
+                          <span key={category} className="px-2.5 py-1 rounded-full border border-[#f4f0e8]/10 bg-[#f4f0e8]/5 text-[10px] font-semibold text-[#8b9691]">
+                            {category}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="lg:col-span-6 rounded-xl border border-[#f4f0e8]/10 bg-[#f4f0e8]/[0.035] p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <AlertTriangle className="w-4 h-4 text-orange-300" />
+                      <p className="text-xs font-bold text-[#f4f0e8] uppercase tracking-wider">Top Blockers</p>
+                    </div>
+                    {blockers.length > 0 ? (
+                      <ul className="space-y-3">
+                        {blockers.map((item: string) => (
+                          <li key={item} className="flex gap-3 text-sm text-[#c9d0cb]/76 leading-relaxed">
+                            <span className="mt-2 h-1.5 w-1.5 rounded-full bg-orange-300 shrink-0" />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-[#8b9691]">No blocker list was found in the structured summary.</p>
+                    )}
+                  </div>
+
+                  <div className="lg:col-span-6 rounded-xl border border-[#f4f0e8]/10 bg-[#f4f0e8]/[0.035] p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <CheckCircle className="w-4 h-4 text-green-300" />
+                      <p className="text-xs font-bold text-[#f4f0e8] uppercase tracking-wider">Quick Wins</p>
+                    </div>
+                    {quickWins.length > 0 ? (
+                      <ul className="space-y-3">
+                        {quickWins.map((item: string) => (
+                          <li key={item} className="flex gap-3 text-sm text-[#c9d0cb]/76 leading-relaxed">
+                            <span className="mt-2 h-1.5 w-1.5 rounded-full bg-green-300 shrink-0" />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-[#8b9691]">Quick wins will appear when the report includes low-effort remediation items.</p>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1273,7 +1391,7 @@ export default function AuditPage() {
                       <div className="bg-gradient-to-br from-primary to-blue-500 w-6 h-6 rounded-lg flex items-center justify-center">
                         <Apple className="w-3 h-3 text-white" />
                       </div>
-                      <span className="text-sm font-bold text-white">Gracias AI</span>
+                      <span className="text-sm font-bold text-white">ipaShip</span>
                       <span className="text-[10px] text-muted-foreground font-medium hidden sm:inline">Compliance Report</span>
                     </div>
                     <span className="text-[10px] text-muted-foreground font-medium">
@@ -1281,13 +1399,10 @@ export default function AuditPage() {
                     </span>
                   </div>
                   <div className="flex items-center gap-3 mt-2 pt-2 border-t border-white/5">
-                    <a href="https://www.producthunt.com/posts/gracias" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-[10px] text-orange-400/80 hover:text-orange-400 font-medium transition-colors">
-                      <Zap className="w-3 h-3" /> Product Hunt
+                    <a href="mailto:hello@ipaship.com" className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-white font-medium transition-colors">
+                      <Mail className="w-3 h-3" /> hello@ipaship.com
                     </a>
-                    <a href="mailto:business@gracias.sh" className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-white font-medium transition-colors">
-                      <Mail className="w-3 h-3" /> business@gracias.sh
-                    </a>
-                    <a href="https://github.com/atharvnaik1/GraciasAi-Appstore-Policy-Auditor-Opensource" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-white font-medium transition-colors">
+                    <a href="https://github.com/atharvnaik1/ipaship-app-reviewer" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-white font-medium transition-colors">
                       <Github className="w-3 h-3" /> Source
                     </a>
                   </div>

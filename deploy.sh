@@ -51,7 +51,7 @@ if [ -d "$APP_DIR" ]; then
     git pull origin main
 else
     echo "    Cloning repository..."
-    git clone https://github.com/atharvnaik1/ipaShip-Ai---Appstore-Playstore-Policy-Auditor-Opensource-.git "$APP_DIR"
+    git clone https://github.com/atharvnaik1/ipaship-app-reviewer.git "$APP_DIR"
     cd "$APP_DIR"
 fi
 
@@ -59,7 +59,8 @@ fi
 if [ ! -f "$APP_DIR/.env.local" ]; then
     echo "==> [5/7] .env.local not found!"
     echo "    Create it manually:"
-    echo "    echo 'MONGODB_URI=your_mongodb_uri_here' > $APP_DIR/.env.local"
+    echo "    cp $APP_DIR/.env.example $APP_DIR/.env.local"
+    echo "    Then fill in the required values in $APP_DIR/.env.local"
     echo ""
     echo "    Then re-run this script."
     exit 1
