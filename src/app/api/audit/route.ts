@@ -492,7 +492,7 @@ export async function POST(req: NextRequest) {
     let headers: Record<string, string> = { 'Content-Type': 'application/json' };
     let payload: any = {};
 
-    const VALID_PROVIDERS = new Set(['ipaship', 'anthropic', 'openai', 'gemini', 'openrouter']);
+    const VALID_PROVIDERS = new Set(['ipaship', 'anthropic', 'openai', 'gemini', 'openrouter', 'nvidia']);
     if (!VALID_PROVIDERS.has(provider)) {
       return NextResponse.json({ error: `Invalid provider: ${provider}` }, { status: 400 });
     }
@@ -535,7 +535,7 @@ export async function POST(req: NextRequest) {
           { role: 'user', content: userPrompt },
         ],
       };
-    } else if (provider === 'ipaship') {
+    } else if (provider === 'ipaship' || provider === 'nvidia') {
       // ipaShip AI uses NVIDIA NIM endpoints natively
       apiUrl = 'https://integrate.api.nvidia.com/v1/chat/completions';
       headers['Authorization'] = `Bearer ${resolvedApiKey.trim()}`;
