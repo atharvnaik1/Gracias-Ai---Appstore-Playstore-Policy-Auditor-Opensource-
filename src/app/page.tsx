@@ -301,6 +301,7 @@ export default function AuditPage() {
         formData.append('provider', provider);
         formData.append('model', model);
         formData.append('context', context);
+        formData.append('debugPrompt', debugPrompt);
         response = await fetch('/api/audit', { method: 'POST', body: formData });
       } else {
         // Fallback: upload + audit in one go
@@ -310,6 +311,7 @@ export default function AuditPage() {
         formData.append('provider', provider);
         formData.append('model', model);
         formData.append('context', context);
+        formData.append('debugPrompt', debugPrompt);
         response = await fetch('/api/audit', { method: 'POST', body: formData });
         setPhase('analyzing');
       }
