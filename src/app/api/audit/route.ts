@@ -579,7 +579,7 @@ export async function POST(req: NextRequest) {
         const reader = response.body!.getReader();
         const decoder = new TextDecoder();
 
-        controller.enqueue(encoder.encode(JSON.stringify({ type: 'meta', filesScanned: files.length }) + '\n'));
+        controller.enqueue(encoder.encode(JSON.stringify({ type: 'meta', filesScanned: files.length, fileNames: files.map(f => f.path) }) + '\n'));
 
         try {
           let buffer = '';
@@ -597,7 +597,14 @@ export async function POST(req: NextRequest) {
                 if (data === '[DONE]') continue;
                 try {
                   const parsed = JSON.parse(data);
-                  const textFragment = parsed.delta?.text || '';
+                  // Anthropic: { delta: { text } }
+                  // OpenAI / OpenRouter: { choices: [{ delta: { content } }] }
+                  // Gemini SSE: { candidates: [{ content: { parts: [{ text }] } }] }
+                  const textFragment =
+                    parsed.delta?.text ||
+                    parsed.choices?.[0]?.delta?.content ||
+                    parsed.candidates?.[0]?.content?.parts?.[0]?.text ||
+                    '';
                   if (textFragment) {
                     controller.enqueue(encoder.encode(JSON.stringify({ type: 'content', text: textFragment }) + '\n'));
                   }
