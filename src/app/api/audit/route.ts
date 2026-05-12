@@ -435,6 +435,31 @@ After the table, provide a brief paragraph summarizing the remediation priority.
   return { system, user };
 }
 
+function getProviderApiKey(provider: string, submittedApiKey: string): string {
+  const directKey = submittedApiKey.trim();
+  if (directKey) return directKey;
+
+  const fallbackKeys: Record<string, string | undefined> = {
+    anthropic: process.env.ANTHROPIC_API_KEY,
+    openai: process.env.OPENAI_API_KEY,
+    gemini: process.env.GEMINI_API_KEY,
+    openrouter: process.env.OPENROUTER_API_KEY,
+    ipaship: process.env.NVIDIA_KEY || process.env.NEXT_PUBLIC_API_KEY,
+  };
+
+  return (fallbackKeys[provider] || process.env.NEXT_PUBLIC_API_KEY || '').trim();
+}
+
+function extractStreamText(parsed: any): string {
+  return (
+    parsed.delta?.text ||
+    parsed.choices?.[0]?.delta?.content ||
+    parsed.choices?.[0]?.text ||
+    parsed.candidates?.[0]?.content?.parts?.map((part: any) => part.text || '').join('') ||
+    ''
+  );
+}
+
 // ─── Main Route Handler ──────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -453,11 +478,11 @@ export async function POST(req: NextRequest) {
 
     // Stream-parse the multipart upload — writes file directly to disk
     // without ever loading the full file into memory
-    const { filePath, fileName, provider, model, context } = await parseMultipartStream(req, tempDir);
-    const resolvedApiKey = process.env.NVIDIA_KEY || process.env.NEXT_PUBLIC_API_KEY || '';
+    const { filePath, fileName, apiKey, provider, model, context } = await parseMultipartStream(req, tempDir);
+    const resolvedApiKey = getProviderApiKey(provider, apiKey);
 
     if (!resolvedApiKey || !resolvedApiKey.trim()) {
-      return NextResponse.json({ error: 'API key is required in environment variables' }, { status: 500 });
+      return NextResponse.json({ error: `API key is required for ${provider}` }, { status: 400 });
     }
 
     // Only accept .ipa, .apk, .zip files
@@ -597,7 +622,7 @@ export async function POST(req: NextRequest) {
                 if (data === '[DONE]') continue;
                 try {
                   const parsed = JSON.parse(data);
-                  const textFragment = parsed.delta?.text || '';
+                  const textFragment = extractStreamText(parsed);
                   if (textFragment) {
                     controller.enqueue(encoder.encode(JSON.stringify({ type: 'content', text: textFragment }) + '\n'));
                   }
