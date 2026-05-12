@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="280" viewBox="0 0 960 280" role="img" aria-labelledby="title desc">
+  <title id="title">Gracias AI wordmark</title>
+  <desc id="desc">Gracias AI wordmark with app audit shield logomark.</desc>
+  <defs>
+    <linearGradient id="tileGradient" x1="52" y1="42" x2="214" y2="234" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#a855f7"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="checkGradient" x1="107" y1="158" x2="164" y2="122" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#a855f7"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+    <filter id="markShadow" x="16" y="18" width="236" height="244" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#172554" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+  <rect width="960" height="280" rx="44" fill="#ffffff"/>
+  <g filter="url(#markShadow)">
+    <rect x="48" y="40" width="208" height="208" rx="54" fill="url(#tileGradient)"/>
+  </g>
+  <path d="M152 72c25 17 46 21 66 21v55c0 40-26 66-66 84-40-18-66-44-66-84V93c20 0 41-4 66-21Z" fill="#ffffff" fill-opacity="0.94"/>
+  <path d="M128 144h48" stroke="#c4b5fd" stroke-width="9" stroke-linecap="round"/>
+  <path d="M140 120l24 48" stroke="#93c5fd" stroke-width="9" stroke-linecap="round"/>
+  <path d="M164 120l-24 48" stroke="#93c5fd" stroke-width="9" stroke-linecap="round"/>
+  <circle cx="128" cy="144" r="11" fill="#a855f7"/>
+  <circle cx="152" cy="120" r="11" fill="#7c3aed"/>
+  <circle cx="176" cy="144" r="11" fill="#3b82f6"/>
+  <circle cx="152" cy="168" r="11" fill="#2563eb"/>
+  <path d="M132 174l17 17 34-40" fill="none" stroke="url(#checkGradient)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="304" y="132" fill="#111827" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="70" font-weight="800" letter-spacing="0">Gracias AI</text>
+  <text x="308" y="184" fill="#475569" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="30" font-weight="600" letter-spacing="0">App Store compliance auditor</text>
+  <path d="M309 208h248" stroke="#a855f7" stroke-width="8" stroke-linecap="round"/>
+  <path d="M579 208h116" stroke="#3b82f6" stroke-width="8" stroke-linecap="round"/>
+</svg>
