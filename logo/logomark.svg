@@ -1,0 +1,36 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Gracias AI logomark</title>
+  <desc id="desc">A rounded app tile containing a shield, neural nodes, and a compliance checkmark.</desc>
+  <defs>
+    <linearGradient id="tile" x1="36" y1="24" x2="220" y2="232" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#a855f7"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="shield" x1="75" y1="48" x2="181" y2="204" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dbeafe"/>
+    </linearGradient>
+    <filter id="soft-shadow" x="21" y="21" width="214" height="214" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#1e1b4b" flood-opacity=".22"/>
+    </filter>
+  </defs>
+
+  <rect x="24" y="24" width="208" height="208" rx="52" fill="url(#tile)"/>
+  <g filter="url(#soft-shadow)">
+    <path d="M128 47 184 67v45c0 39-21 73-56 96-35-23-56-57-56-96V67l56-20Z" fill="url(#shield)"/>
+  </g>
+
+  <path d="M128 47v161c35-23 56-57 56-96V67l-56-20Z" fill="#eff6ff" opacity=".7"/>
+  <path d="M91 92h74" stroke="#93c5fd" stroke-width="8" stroke-linecap="round" opacity=".8"/>
+  <path d="M91 118h74" stroke="#c4b5fd" stroke-width="8" stroke-linecap="round" opacity=".8"/>
+  <path d="M91 144h74" stroke="#93c5fd" stroke-width="8" stroke-linecap="round" opacity=".8"/>
+
+  <circle cx="96" cy="92" r="8" fill="#a855f7"/>
+  <circle cx="160" cy="92" r="8" fill="#3b82f6"/>
+  <circle cx="128" cy="118" r="9" fill="#7c3aed"/>
+  <circle cx="96" cy="144" r="8" fill="#3b82f6"/>
+  <circle cx="160" cy="144" r="8" fill="#a855f7"/>
+
+  <path d="m103 162 18 18 36-43" stroke="#16a34a" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M128 48 184 68v44c0 39-21 73-56 96-35-23-56-57-56-96V68l56-20Z" stroke="#ffffff" stroke-width="6" stroke-linejoin="round" opacity=".72"/>
+</svg>
