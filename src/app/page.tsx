@@ -62,6 +62,7 @@ export default function AuditPage() {
   const [file, setFile] = useState<File | null>(null);
   const [provider, setProvider] = useState('ipaship');
   const [model, setModel] = useState('glm-5.1');
+  const [apiKey, setApiKey] = useState('');
   const [context, setContext] = useState('');
   const [phase, setPhase] = useState<AuditPhase>('idle');
   const [reportContent, setReportContent] = useState('');
@@ -268,6 +269,7 @@ export default function AuditPage() {
         formData.append('fileName', file.name);
         formData.append('provider', provider);
         formData.append('model', model);
+        formData.append('apiKey', apiKey);
         formData.append('context', context);
         response = await fetch('/api/audit', { method: 'POST', body: formData });
       } else {
@@ -277,6 +279,7 @@ export default function AuditPage() {
         formData.append('file', file);
         formData.append('provider', provider);
         formData.append('model', model);
+        formData.append('apiKey', apiKey);
         formData.append('context', context);
         response = await fetch('/api/audit', { method: 'POST', body: formData });
         setPhase('analyzing');
@@ -865,6 +868,21 @@ export default function AuditPage() {
                       </div>
 
                       {/* API Key */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Key className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-xs font-semibold text-white">API Key <span className="text-muted-foreground font-normal">(optional if configured on server)</span></span>
+                        </div>
+                        <input
+                          value={apiKey}
+                          onChange={(e) => setApiKey(e.target.value)}
+                          type="password"
+                          autoComplete="off"
+                          spellCheck={false}
+                          placeholder="Paste your provider API key"
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all"
+                        />
+                      </div>
 
                       {/* Context */}
                       <div className="flex-1 flex flex-col space-y-2">
