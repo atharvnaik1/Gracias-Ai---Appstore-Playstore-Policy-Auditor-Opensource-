@@ -51,6 +51,14 @@ const providerModels: Record<string, { label: string; value: string }[]> = {
   ],
 };
 
+const providerKeyLabels: Record<string, string> = {
+  ipaship: 'NVIDIA API Key',
+  anthropic: 'Claude API Key',
+  openai: 'OpenAI API Key',
+  gemini: 'Gemini API Key',
+  openrouter: 'OpenRouter API Key',
+};
+
 const selectStyle = {
   backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22white%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")',
   backgroundRepeat: 'no-repeat' as const,
@@ -62,6 +70,9 @@ export default function AuditPage() {
   const [file, setFile] = useState<File | null>(null);
   const [provider, setProvider] = useState('ipaship');
   const [model, setModel] = useState('glm-5.1');
+  const [apiKey, setApiKey] = useState(() => (
+    typeof window === 'undefined' ? '' : window.localStorage.getItem('ipaship:ipaship:api-key') || ''
+  ));
   const [context, setContext] = useState('');
   const [phase, setPhase] = useState<AuditPhase>('idle');
   const [reportContent, setReportContent] = useState('');
@@ -99,6 +110,14 @@ export default function AuditPage() {
       .catch(() => { setStarCount(0); });
   }, []);
 
+  useEffect(() => {
+    const storageKey = `ipaship:${provider}:api-key`;
+    if (apiKey.trim()) {
+      window.localStorage.setItem(storageKey, apiKey);
+    } else {
+      window.localStorage.removeItem(storageKey);
+    }
+  }, [apiKey, provider]);
 
   // Auto-start audit as soon as upload finishes
   useEffect(() => {
@@ -269,6 +288,7 @@ export default function AuditPage() {
         formData.append('provider', provider);
         formData.append('model', model);
         formData.append('context', context);
+        if (apiKey.trim()) formData.append('apiKey', apiKey.trim());
         response = await fetch('/api/audit', { method: 'POST', body: formData });
       } else {
         // Fallback: upload + audit in one go
@@ -278,6 +298,7 @@ export default function AuditPage() {
         formData.append('provider', provider);
         formData.append('model', model);
         formData.append('context', context);
+        if (apiKey.trim()) formData.append('apiKey', apiKey.trim());
         response = await fetch('/api/audit', { method: 'POST', body: formData });
         setPhase('analyzing');
       }
@@ -842,6 +863,7 @@ export default function AuditPage() {
                             const p = e.target.value;
                             setProvider(p);
                             setModel(providerModels[p][0].value);
+                            setApiKey(window.localStorage.getItem(`ipaship:${p}:api-key`) || '');
                           }}
                           className="w-full bg-white/5 border border-white/10 text-xs text-white font-medium px-3 py-2.5 rounded-xl outline-none focus:ring-1 focus:ring-primary/50 appearance-none cursor-pointer hover:bg-white/[0.08] transition-colors"
                           style={selectStyle}
@@ -865,6 +887,24 @@ export default function AuditPage() {
                       </div>
 
                       {/* API Key */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Key className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-xs font-semibold text-white">{providerKeyLabels[provider] || 'API Key'}</span>
+                        </div>
+                        <input
+                          type="password"
+                          value={apiKey}
+                          onChange={(e) => setApiKey(e.target.value)}
+                          autoComplete="off"
+                          spellCheck={false}
+                          placeholder={`Paste ${providerKeyLabels[provider] || 'API key'} or use server environment`}
+                          className="w-full bg-white/5 border border-white/10 text-xs text-white font-medium px-3 py-2.5 rounded-xl outline-none focus:ring-1 focus:ring-emerald-400/50 focus:border-emerald-400/40 placeholder:text-muted-foreground/50 transition-colors"
+                        />
+                        <p className="text-[10px] leading-relaxed text-muted-foreground/70">
+                          Stored only in this browser and sent with the audit request; the server does not persist it.
+                        </p>
+                      </div>
 
                       {/* Context */}
                       <div className="flex-1 flex flex-col space-y-2">
@@ -1056,7 +1096,7 @@ export default function AuditPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         {[
                           { title: 'No Cloud Storage', desc: 'Files are processed in ephemeral temp directories and deleted immediately after audit.' },
-                          { title: 'Bring Your Own Key', desc: 'Your API key goes directly to your AI provider. We never store or log it.' },
+                          { title: 'Bring Your Own Key', desc: 'Your key is sent only with the audit request and is not stored server-side.' },
                           { title: 'Fully Auditable', desc: 'Read every line of our open-source code on GitHub. Full transparency.' },
                         ].map((item) => (
                           <div key={item.title} className="flex gap-3">

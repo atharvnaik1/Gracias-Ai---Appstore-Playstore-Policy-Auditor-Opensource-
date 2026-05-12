@@ -49,6 +49,27 @@ const SKIP_DIRS = new Set([
 
 const MAX_FILE_SIZE = 50_000; // 50KB per individual source file
 const MAX_TOTAL_CONTENT = 350_000; // 350KB total context (roughly ~90k tokens max)
+const VALID_PROVIDERS = new Set(['ipaship', 'anthropic', 'openai', 'gemini', 'openrouter']);
+
+const PROVIDER_ENV_KEYS: Record<string, string[]> = {
+  ipaship: ['NVIDIA_KEY', 'NVIDIA_API_KEY', 'NEXT_PUBLIC_API_KEY'],
+  anthropic: ['ANTHROPIC_API_KEY', 'CLAUDE_API_KEY', 'NEXT_PUBLIC_API_KEY'],
+  openai: ['OPENAI_API_KEY', 'NEXT_PUBLIC_API_KEY'],
+  gemini: ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'NEXT_PUBLIC_API_KEY'],
+  openrouter: ['OPENROUTER_API_KEY', 'NEXT_PUBLIC_API_KEY'],
+};
+
+function resolveProviderApiKey(provider: string, submittedApiKey: string): string {
+  const trimmedSubmittedKey = submittedApiKey.trim();
+  if (trimmedSubmittedKey) return trimmedSubmittedKey;
+
+  for (const envKey of PROVIDER_ENV_KEYS[provider] || []) {
+    const value = process.env[envKey]?.trim();
+    if (value) return value;
+  }
+
+  return '';
+}
 
 function getClientKey(req: NextRequest): string {
   const forwarded = req.headers.get('x-forwarded-for');
@@ -453,11 +474,16 @@ export async function POST(req: NextRequest) {
 
     // Stream-parse the multipart upload — writes file directly to disk
     // without ever loading the full file into memory
-    const { filePath, fileName, provider, model, context } = await parseMultipartStream(req, tempDir);
-    const resolvedApiKey = process.env.NVIDIA_KEY || process.env.NEXT_PUBLIC_API_KEY || '';
+    const { filePath, fileName, apiKey, provider, model, context } = await parseMultipartStream(req, tempDir);
+
+    if (!VALID_PROVIDERS.has(provider)) {
+      return NextResponse.json({ error: `Invalid provider: ${provider}` }, { status: 400 });
+    }
+
+    const resolvedApiKey = resolveProviderApiKey(provider, apiKey);
 
     if (!resolvedApiKey || !resolvedApiKey.trim()) {
-      return NextResponse.json({ error: 'API key is required in environment variables' }, { status: 500 });
+      return NextResponse.json({ error: `API key is required for ${provider}` }, { status: 500 });
     }
 
     // Only accept .ipa, .apk, .zip files
@@ -491,11 +517,6 @@ export async function POST(req: NextRequest) {
     let apiUrl = '';
     let headers: Record<string, string> = { 'Content-Type': 'application/json' };
     let payload: any = {};
-
-    const VALID_PROVIDERS = new Set(['ipaship', 'anthropic', 'openai', 'gemini', 'openrouter']);
-    if (!VALID_PROVIDERS.has(provider)) {
-      return NextResponse.json({ error: `Invalid provider: ${provider}` }, { status: 400 });
-    }
 
     // AbortController to cancel AI request if client disconnects
     const abortController = new AbortController();
