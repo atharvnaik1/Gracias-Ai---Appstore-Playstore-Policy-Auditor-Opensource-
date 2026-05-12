@@ -26,14 +26,19 @@ export const maxDuration = 300; // 5 minutes
 const MAX_UPLOAD_SIZE = 150 * 1024 * 1024; // 150MB hard limit
 
 const RELEVANT_EXTENSIONS = new Set([
-  '.swift', '.dart', '.m', '.h', '.mm',
+  // iOS
+  '.swift', '.m', '.h', '.mm',
   '.plist', '.storyboard', '.xib', '.pbxproj',
-  '.entitlements', '.json', '.xml', '.yaml', '.yml',
-  '.md', '.txt', '.strings', '.xcprivacy',
-  '.js', '.ts', '.tsx', '.jsx',
-  '.java', '.kt', '.xml', '.gradle', '.pro', // Android extensions
-  '.html', '.css',
+  '.entitlements', '.xcprivacy',
+  // Cross-platform
+  '.dart',
+  // Web / JS
+  '.js', '.ts', '.tsx', '.jsx', '.html', '.css',
+  // Android
   '.java', '.kt', '.gradle', '.pro', '.properties',
+  // Config / data
+  '.json', '.xml', '.yaml', '.yml',
+  '.md', '.txt', '.strings',
 ]);
 
 const SKIP_DIRS = new Set([
@@ -116,7 +121,7 @@ function parseMultipartStream(
     // Resolve only when both busboy is done AND the file has been fully written to disk
     const tryResolve = () => {
       if (busboyFinished && writeFinished && !rejected) {
-        resolve({ filePath, fileName, apiKey, provider, model, context });
+        resolve({ filePath, fileName, apiKey, provider, model, context, fileId: path.basename(tempDir) });
       }
     };
 
