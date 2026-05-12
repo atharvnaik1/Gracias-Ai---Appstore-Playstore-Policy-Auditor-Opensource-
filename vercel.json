@@ -1,0 +1,28 @@
+json
+{
+  "project": "ipaship-app-reviewer",
+  "teamId": "team_c0hqDrZckNBm5AkYTYHVKoE8",
+  "slug": "ipaship-app-reviewer",
+  "gitRepository": {
+    "slug": "ipaship-app-reviewer"
+  },
+  "builds": [
+    {
+      "src": "src/**",
+      "use": "@vercel/next"
+    }
+  ],
+  "outputDirectory": "public",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "git": {
+    "deploymentBranch": "main"
+  }
+}

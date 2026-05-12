@@ -1,20 +1,19 @@
-FROM node:22-alpine
+dockerfile
+# Dockerfile for Node 20 Alpine
+FROM node:20-alpine
 
+# Set working directory
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-RUN npm install
+# Install production dependencies
+COPY package*.json ./
+RUN npm ci --only=production
 
+# Copy application source
 COPY . .
 
-RUN npm run build
+# Expose application port
+EXPOSE 3000
 
-# IMPORTANT FIX ↓↓↓
-RUN cp -r .next/static .next/standalone/.next/ && \
-    cp -r public .next/standalone/
-
-WORKDIR /app/.next/standalone
-
-EXPOSE 8080
-
-CMD ["node", "server.js"]
+# Run the application
+CMD ["npm", "start"]

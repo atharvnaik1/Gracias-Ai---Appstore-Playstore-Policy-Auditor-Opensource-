@@ -1,214 +1,202 @@
-# ipaShip - App Store Compliance Auditor (Open Source)
+python
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-AI-powered iOS App Store compliance auditor. Upload your `.ipa` file and get a comprehensive audit against Apple's Review Guidelines — before you submit.
+"""
+Setup and deployment helper for the llm-microservice project.
 
-**Live at: [ipaship.com](https://ipaship.com)**
+Features
+--------
+* **Prerequisites** – checks for Python, Docker and Vercel CLI.
+* **Docker workflow** – build and run the container locally.
+* **Vercel deployment guide** – step‑by‑step instructions and
+  quick‑start commands.
+"""
 
-## Features
+import argparse
+import logging
+import os
+import subprocess
+import sys
+from pathlib import Path
 
-- **IPA Analysis** — Upload `.ipa` files (up to 150MB) for automated compliance auditing
-- **Full Guidelines Coverage** — Checks all 6 major App Store Review Guideline categories: Safety, Performance, Business, Design, Legal & Privacy, and Technical
-- **Multi-Provider AI** — Bring your own key from Anthropic (Claude), OpenAI (GPT), Google Gemini, or OpenRouter
-- **Model Selection** — Choose specific models per provider (Claude Sonnet 4, GPT-4o, Gemini 2.5 Flash, etc.)
-- **Real-Time Streaming** — Watch your audit report generate live as the AI analyzes your code
-- **Export Reports** — Download as Markdown or PDF
-- **Zero-Trust Security** — Files processed in ephemeral temp storage and deleted immediately. API keys stay in your browser, never on our servers
-- **100% Open Source** — Fully auditable codebase
+# --------------------------------------------------------------------------- #
+# Logging configuration
+# --------------------------------------------------------------------------- #
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+LOGGER = logging.getLogger(__name__)
 
-## Tech Stack
+# --------------------------------------------------------------------------- #
+# Constants
+# --------------------------------------------------------------------------- #
+PROJECT_ROOT = Path(__file__).resolve().parent
+VERCEL_AUTH_URL = (
+    "https://vercel.com/git/authorize?"
+    "team=atharvnaik1%20projects&"
+    "slug=atharvnaik1s-projects&"
+    "teamId=team_c0hqDrZckNBm5AkYTYHVKoE8&"
+    "type=github"
+)
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 15, React 19, TypeScript, Tailwind CSS, Framer Motion |
-| Backend | Next.js API Routes (Node.js) |
-| Database | MongoDB (Mongoose) |
-| AI Providers | Anthropic, OpenAI, Google Gemini, OpenRouter |
-| File Processing | Busboy (streaming uploads), `unzip` (IPA extraction) |
-| Export | html2pdf.js, React Markdown |
+# --------------------------------------------------------------------------- #
+# Helper utilities
+# --------------------------------------------------------------------------- #
+def _run_cmd(command: list[str], cwd: Path | None = None) -> None:
+    """Execute a shell command, raising on failure."""
+    LOGGER.debug("Running command: %s", " ".join(command))
+    result = subprocess.run(
+        command,
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        check=False,
+    )
+    LOGGER.info(result.stdout)
+    if result.returncode != 0:
+        raise RuntimeError(f"Command {' '.join(command)} failed with code {result.returncode}")
 
-## Getting Started
 
-### Prerequisites
+def _check_executable(name: str) -> bool:
+    """Return True if *name* is available on PATH."""
+    return subprocess.run(["which", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
 
-- Node.js 18+
-- MongoDB URI (Atlas or local)
-- API key from at least one AI provider
-- `unzip` installed on the server/runtime environment
 
-```bash
-# Ubuntu/Debian
-sudo apt-get update && sudo apt-get install -y unzip
-```
+# --------------------------------------------------------------------------- #
+# Prerequisite checks
+# --------------------------------------------------------------------------- #
+def check_prerequisites() -> None:
+    """Validate that required tools are installed."""
+    missing = []
+    for tool in ("python3", "docker", "vercel"):
+        if not _check_executable(tool):
+            missing.append(tool)
+    if missing:
+        raise EnvironmentError(
+            f"The following required tools are missing or not on PATH: {', '.join(missing)}"
+        )
+    LOGGER.info("All required tools are present.")
 
-### Setup
 
-```bash
-# Clone the repo
-git clone https://github.com/atharvnaik1/ipaShip-Ai---Appstore-Playstore-Policy-Auditor-Opensource-.git
-cd ipaShip-Ai---Appstore-Playstore-Policy-Auditor-Opensource-
+# --------------------------------------------------------------------------- #
+# Docker workflow
+# --------------------------------------------------------------------------- #
+DOCKER_IMAGE_TAG = "llm-microservice:latest"
 
-# Install dependencies
-npm install
 
-# Create environment file
-echo 'MONGODB_URI=your_mongodb_uri_here' > .env.local
+def docker_build() -> None:
+    """Build the Docker image for the project."""
+    check_prerequisites()
+    dockerfile = PROJECT_ROOT / "Dockerfile"
+    if not dockerfile.is_file():
+        raise FileNotFoundError("Dockerfile not found in project root.")
+    _run_cmd(
+        ["docker", "build", "-t", DOCKER_IMAGE_TAG, "."],
+        cwd=PROJECT_ROOT,
+    )
+    LOGGER.info("Docker image built as %s.", DOCKER_IMAGE_TAG)
 
-# Start dev server
-npm run dev
-```
 
-Open [http://localhost:8080](http://localhost:8080) in your browser.
+def docker_run(detach: bool = False, port: int = 8000) -> None:
+    """Run the Docker container locally."""
+    check_prerequisites()
+    run_cmd = [
+        "docker",
+        "run",
+        "--rm",
+        "-p",
+        f"{port}:8000",
+        "-e",
+        "PYTHONUNBUFFERED=1",
+    ]
+    if detach:
+        run_cmd.append("-d")
+    run_cmd.append(DOCKER_IMAGE_TAG)
+    _run_cmd(run_cmd)
+    LOGGER.info("Docker container started on http://localhost:%d", port)
 
-### Production Build
 
-```bash
-npm run build
-npm start
-```
+# --------------------------------------------------------------------------- #
+# Vercel deployment guide
+# --------------------------------------------------------------------------- #
+def vercel_deployment_guide() -> str:
+    """Return a concise Vercel deployment guide."""
+    steps = [
+        "Vercel Deployment Guide",
+        "------------------------",
+        "1. Authorize the deployment for the atharvnaik1's projects team:",
+        f"   {VERCEL_AUTH_URL}",
+        "2. Install the Vercel CLI (if not already installed):",
+        "   $ npm i -g vercel",
+        "3. Log in to Vercel:",
+        "   $ vercel login",
+        "4. Link the local project to the Vercel project:",
+        "   $ vercel link --project <PROJECT_ID> --org <ORG_ID>",
+        "5. Add required environment variables (replace placeholders):",
+        "   $ vercel env add <NAME> <VALUE> --prod   # repeat for each variable",
+        "6. Deploy to production:",
+        "   $ vercel deploy --prod",
+        "",
+        "Prerequisites for Vercel deployment:",
+        "   • Node.js >= 16 (for the Vercel CLI)",
+        "   • A Vercel account with access to the atharvnaik1's projects team",
+        "   • All project dependencies installed locally (pip install -r requirements.txt)",
+    ]
+    return "\n".join(steps)
 
-## How It Works
 
-1. **Upload** — Drop your `.ipa` file. The server streams it to disk via Busboy without buffering in memory.
-2. **Extract** — The IPA is unzipped and all relevant source files are collected (`.swift`, `.m`, `.plist`, `.entitlements`, `.storyboard`, `.xcprivacy`, etc.). Binary files and build artifacts are skipped.
-3. **Analyze** — Source files are sent to your chosen AI provider with a structured audit prompt. The response streams back in real-time.
-4. **Report** — You get a structured compliance report with pass/fail indicators, severity ratings, and a prioritized remediation plan.
+def print_vercel_guide() -> None:
+    """Print the Vercel deployment guide to stdout."""
+    LOGGER.info("Displaying Vercel deployment guide:")
+    print(vercel_deployment_guide())
 
-## API Endpoints
 
-| Method | Endpoint | Purpose |
-|--------|----------|---------|
-| `POST` | `/api/audit` | Upload IPA, stream AI audit report |
-| `POST` | `/api/save-report` | Save report to MongoDB |
-| `GET` | `/api/visitor` | Increment and return visitor count |
+# --------------------------------------------------------------------------- #
+# Command‑line interface
+# --------------------------------------------------------------------------- #
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Project setup & deployment helper")
+    subparsers = parser.add_subparsers(dest="command", required=True)
 
-## Client Wrappers / SDKs
+    # Prerequisites
+    subparsers.add_parser("check-prereqs", help="Validate required tools are installed")
 
-ipaShip provides ready-to-use boilerplate SDKs and wrappers for various ecosystems and languages. You can find them in the `wrappers/` directory. Each wrapper is skeletoned to pragmatically audit your `.ipa` files directly from your CI/CD pipelines, backend backend, or build environments!
+    # Docker
+    docker_parser = subparsers.add_parser("docker", help="Docker related commands")
+    docker_sub = docker_parser.add_subparsers(dest="docker_cmd", required=True)
+    docker_sub.add_parser("build", help="Build Docker image")
+    run_parser = docker_sub.add_parser("run", help="Run Docker container")
+    run_parser.add_argument("--detach", action="store_true", help="Run container in background")
+    run_parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Host port to bind the container (default: 8000)",
+    )
 
-### Commands to Run Wrappers
+    # Vercel
+    subparsers.add_parser("vercel-guide", help="Print Vercel deployment instructions")
 
-Here are quick commands to interact with the given wrappers:
+    args = parser.parse_args()
 
-**Node.js / NPM**
-```bash
-cd wrappers/npm && npm install
-node index.js
-```
+    try:
+        if args.command == "check-prereqs":
+            check_prerequisites()
+        elif args.command == "docker":
+            if args.docker_cmd == "build":
+                docker_build()
+            elif args.docker_cmd == "run":
+                docker_run(detach=args.detach, port=args.port)
+        elif args.command == "vercel-guide":
+            print_vercel_guide()
+    except Exception as exc:
+        LOGGER.error("Error: %s", exc)
+        sys.exit(1)
 
-**Python**
-```bash
-cd wrappers/python
-python3 ipaship.py
-```
 
-**Rust**
-```bash
-cd wrappers/rust
-cargo run --release
-```
-
-**Go**
-```bash
-cd wrappers/go
-go run ipaship.go
-```
-
-**Homebrew (MacOS CLI)**
-```bash
-brew install ./wrappers/homebrew/ipaship.rb
-ipaship /path/to/app.ipa
-```
-
-**C / C++**
-```bash
-cd wrappers/c && gcc ipaship.c -o ipaship && ./ipaship
-cd wrappers/cpp && g++ ipaship.cpp -o ipaship && ./ipaship
-```
-
-**Java & Kotlin**
-```bash
-# Java
-cd wrappers/java && mvn clean install
-# Kotlin
-cd wrappers/kotlin && ./gradlew build
-```
-
-**Ruby**
-```bash
-cd wrappers/ruby
-gem build ipaship.gemspec
-```
-
-**PHP**
-```bash
-cd wrappers/php
-composer install
-```
-
-**C# / .NET**
-```bash
-cd wrappers/csharp-dotnet
-dotnet build
-```
-
-**R**
-```R
-# Load inside your R script (wrappers/r)
-source("R/ipaship.R")
-ipaship_audit("app.ipa", "API_KEY")
-```
-
-**Linux (Bash CLI)**
-```bash
-chmod +x wrappers/linux/ipaship-cli.sh
-./wrappers/linux/ipaship-cli.sh /path/to/app.ipa "YOUR_API_KEY"
-```
-
-**Swift & Apple Frameworks (Obj-C / Cocoapods)**
-- Add `wrappers/swift-cocoapods` as a local Swift Package Dependency.
-- Integrate the Objective-C headers from `wrappers/objc` into your build.
-
-**Cross-Platform App Frameworks (Dart/Flutter, Expo, Ionic)**
-- **Flutter:** Import `wrappers/flutter-dart` via local path dependency in your `pubspec.yaml`.
-- **Expo:** Integrate `wrappers/expo/index.js` as an Expo config plugin.
-- **Ionic:** Use the `wrappers/ionic` wrapper with Capacitor.
-
-## Deployment
-
-A deployment script is included for Ubuntu 24.04 VMs:
-
-```bash
-# On the server, create .env.local first
-echo 'MONGODB_URI=your_mongodb_uri_here' > /opt/ipaship/.env.local
-
-# Ensure unzip is installed (required by /api/audit extraction)
-sudo apt-get update && sudo apt-get install -y unzip
-
-# Then run the deploy script
-chmod +x deploy.sh
-./deploy.sh
-```
-
-The script sets up Node.js 20, PM2, Nginx (with streaming/upload support), and UFW firewall.
-
-## Security
-
-- **No cloud storage** — Files are processed in ephemeral `/tmp` directories and deleted immediately after audit
-- **BYOK (Bring Your Own Key)** — API keys are stored in your browser's localStorage, never sent to our servers
-- **No shell injection** — File extraction uses `execFile` (no shell), preventing command injection via filenames
-- **Binary detection** — Binary plists and compiled files are detected and skipped
-- **Rate limiting** — 5 requests per IP per minute via in-memory LRU cache
-- **Prompt injection guards** — System/user message separation with explicit instructions to treat file contents as data only
-
-## Contributing
-
-Contributions are welcome! Feel free to open issues or submit pull requests.
-
-## License
-
-Open source. See repository for details.
-
----
-
-Built by [ipaShip](https://ipaship.com)
-© ipaShip – Original Creator: Atharv Naik
+if __name__ == "__main__":
+    main()

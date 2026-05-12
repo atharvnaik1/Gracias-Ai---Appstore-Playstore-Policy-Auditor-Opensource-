@@ -1,3 +1,4 @@
+bash
 #!/bin/bash
 set -euo pipefail
 
@@ -11,6 +12,8 @@ APP_DIR="/opt/ipaship"
 NODE_MAJOR=20
 APP_PORT=8080
 SERVER_IP="216.48.182.78"
+VERCEL_TEAM="atharvnaik1"
+VERCEL_PROJECT="ipaship"   # Vercel project name (must match the Vercel dashboard)
 
 echo ""
 echo "=========================================="
@@ -19,16 +22,16 @@ echo "=========================================="
 echo ""
 
 # ─── 1. System packages ───────────────────────
-echo "==> [1/7] Updating system & installing dependencies..."
+echo "==> [1/8] Updating system & installing dependencies..."
 apt-get update -qq
 apt-get install -y curl git unzip nginx ufw > /dev/null 2>&1
 echo "    Done."
 
 # ─── 2. Node.js ───────────────────────────────
 if command -v node &> /dev/null && [[ "$(node -v | cut -d. -f1 | tr -d v)" -ge 18 ]]; then
-    echo "==> [2/7] Node.js $(node -v) already installed. Skipping."
+    echo "==> [2/8] Node.js $(node -v) already installed. Skipping."
 else
-    echo "==> [2/7] Installing Node.js ${NODE_MAJOR}.x..."
+    echo "==> [2/8] Installing Node.js ${NODE_MAJOR}.x..."
     curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - > /dev/null 2>&1
     apt-get install -y nodejs > /dev/null 2>&1
     echo "    Node $(node -v), npm $(npm -v)"
@@ -36,15 +39,24 @@ fi
 
 # ─── 3. PM2 ───────────────────────────────────
 if command -v pm2 &> /dev/null; then
-    echo "==> [3/7] PM2 already installed. Skipping."
+    echo "==> [3/8] PM2 already installed. Skipping."
 else
-    echo "==> [3/7] Installing PM2..."
+    echo "==> [3/8] Installing PM2..."
     npm install -g pm2 > /dev/null 2>&1
     echo "    Done."
 fi
 
-# ─── 4. App code ──────────────────────────────
-echo "==> [4/7] Setting up application..."
+# ─── 4. Vercel CLI ───────────────────────────
+if command -v vercel &> /dev/null; then
+    echo "==> [4/8] Vercel CLI already installed. Skipping."
+else
+    echo "==> [4/8] Installing Vercel CLI..."
+    npm install -g vercel > /dev/null 2>&1
+    echo "    Vercel CLI installed."
+fi
+
+# ─── 5. App code ──────────────────────────────
+echo "==> [5/8] Setting up application..."
 if [ -d "$APP_DIR" ]; then
     echo "    Directory exists. Pulling latest code..."
     cd "$APP_DIR"
@@ -55,35 +67,74 @@ else
     cd "$APP_DIR"
 fi
 
-# ─── 5. Environment file ──────────────────────
+# ─── 6. Environment file ──────────────────────
 if [ ! -f "$APP_DIR/.env.local" ]; then
-    echo "==> [5/7] .env.local not found!"
+    echo "==> [6/8] .env.local not found!"
     echo "    Create it manually:"
     echo "    echo 'MONGODB_URI=your_mongodb_uri_here' > $APP_DIR/.env.local"
     echo ""
     echo "    Then re-run this script."
     exit 1
 else
-    echo "==> [5/7] .env.local exists. Skipping."
+    echo "==> [6/8] .env.local exists. Skipping."
 fi
 
-# ─── 6. Build ─────────────────────────────────
-echo "==> [6/7] Installing dependencies & building..."
+# ─── 7. Build ─────────────────────────────────
+echo "==> [7/8] Installing dependencies & building..."
 cd "$APP_DIR"
 npm ci 2>&1 | tail -3
 echo "    Building Next.js app..."
 npm run build 2>&1 | tail -5
 echo "    Build complete."
 
-# ─── 7. PM2 ───────────────────────────────────
-echo "==> [7/7] Starting app with PM2..."
+# ─── 8. Pre‑deployment Vercel Checks ───────────────────────
+echo "==> [8/8] Verifying Vercel authentication and team access..."
+
+# Ensure VERCEL_TOKEN is set
+if [ -z "${VERCEL_TOKEN:-}" ]; then
+    echo "    Error: VERCEL_TOKEN environment variable not set."
+    echo "    Please follow the instructions in VERCEL_AUTH.md to obtain and export a token."
+    exit 1
+fi
+
+# Login to Vercel using token
+vercel login --token "$VERCEL_TOKEN" > /dev/null 2>&1
+
+# Verify Vercel authentication works
+if ! vercel whoami --token "$VERCEL_TOKEN" > /dev/null 2>&1; then
+    echo "    Error: Vercel authentication failed."
+    echo "    Please ensure your VERCEL_TOKEN is valid. See VERCEL_AUTH.md for guidance."
+    exit 1
+fi
+
+# Verify we have access to the correct team
+if ! vercel teams list --token "$VERCEL_TOKEN" | grep -q "$VERCEL_TEAM"; then
+    echo "    Error: Vercel team '$VERCEL_TEAM' not found in your account."
+    echo "    Ensure you are a member of the team and have authorized it. See VERCEL_AUTH.md."
+    exit 1
+fi
+
+# ─── 9. Vercel Authorization & Deployment ───────
+# Link the repository to the Vercel project (fails if repo not authorized)
+if ! vercel link --project "$VERCEL_PROJECT" --git-provider github --repo "atharvnaik1/ipaShip-Ai---Appstore-Playstore-Policy-Auditor-Opensource-" --team "$VERCEL_TEAM" --token "$VERCEL_TOKEN" > /dev/null 2>&1; then
+    echo "    Error: Repository is not authorized for team '$VERCEL_TEAM'."
+    echo "    Please authorize the repository via the Vercel dashboard or the provided URL."
+    exit 1
+fi
+
+# Deploy to Vercel with the correct team, project, and production flag
+vercel --prod --project "$VERCEL_PROJECT" --team "$VERCEL_TEAM" --token "$VERCEL_TOKEN"
+echo "    Vercel deployment triggered."
+
+# ─── 10. PM2 ───────────────────────────────────
+echo "==> [9/9] Starting app with PM2..."
 pm2 delete "$APP_NAME" 2>/dev/null || true
 cd "$APP_DIR"
 PORT=$APP_PORT pm2 start npm --name "$APP_NAME" -- start
 pm2 save > /dev/null 2>&1
 pm2 startup systemd -u root --hp /root > /dev/null 2>&1 || true
 
-# ─── Nginx ─────────────────────────────────────
+# ─── 11. Nginx ─────────────────────────────────────
 echo "==> Configuring Nginx..."
 cat > /etc/nginx/sites-available/ipaship << NGINXEOF
 server {
@@ -127,7 +178,7 @@ nginx -t 2>&1 | head -2
 systemctl enable nginx > /dev/null 2>&1
 systemctl restart nginx
 
-# ─── Firewall ──────────────────────────────────
+# ─── 12. Firewall ──────────────────────────────────
 echo "==> Configuring firewall..."
 ufw allow OpenSSH > /dev/null 2>&1
 ufw allow 'Nginx Full' > /dev/null 2>&1
