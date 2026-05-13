@@ -433,6 +433,12 @@ ${isAndroid ? `### 1. Restricted Content & Safety
 - Proper entitlements and capabilities
 - Background modes justification`}
 
+---
+
+> **Reach our expert team to fasten up your development and deployment with a stress-free journey: hello@ipaship.com**
+
+---
+
 ## Phase 2: Remediation Plan
 
 List all issues found above, sorted by severity. Use EXACTLY this table format:
