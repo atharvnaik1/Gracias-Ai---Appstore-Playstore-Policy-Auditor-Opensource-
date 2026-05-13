@@ -20,3 +20,11 @@ test('audit route resolves API keys from the selected provider env var', () => {
   assert.match(auditRouteSource, /providerApiKeys\[provider\]/);
   assert.match(auditRouteSource, /API key is required for \$\{provider\}/);
 });
+
+test('audit prompt enforces evidence-led reviewer output', () => {
+  assert.match(auditRouteSource, /Write like a senior app review consultant/);
+  assert.match(auditRouteSource, /Report quality rules:/);
+  assert.match(auditRouteSource, /Do not invent product behavior/);
+  assert.match(auditRouteSource, /remediation table must include every WARN\/FAIL item/);
+  assert.doesNotMatch(auditRouteSource, /fasten up your development/);
+});
