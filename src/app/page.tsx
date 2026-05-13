@@ -15,6 +15,7 @@ import remarkGfm from 'remark-gfm';
 import Link from 'next/link';
 import { UserButton, SignedOut, SignedIn, useAuth, useClerk } from '@clerk/nextjs';
 import { buildFixPlanMarkdown, parseReportSummary } from '../utils/report-summary.mjs';
+import AIDebugger from '../components/AIDebugger';
 
 type AuditPhase = 'idle' | 'uploading' | 'analyzing' | 'complete' | 'error';
 
@@ -160,6 +161,8 @@ export default function AuditPage() {
   const [uploadedFileId, setUploadedFileId] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState('');
   const [isAutoAnalyzing, setIsAutoAnalyzing] = useState(false);
+  // AI Debugger audit logs
+  const [auditLogs, setAuditLogs] = useState<string[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const reportRef = useRef<HTMLDivElement>(null);
@@ -347,6 +350,7 @@ export default function AuditPage() {
     setErrorMessage('');
     setFilesScanned(0);
     setFileNames([]);
+    setAuditLogs(prev => [...prev, `[phase] Starting audit analysis`]);
 
     try {
       let response: Response;
@@ -363,6 +367,7 @@ export default function AuditPage() {
       } else {
         // Fallback: upload + audit in one go
         setPhase('uploading');
+        setAuditLogs(prev => [...prev, `[phase] Uploading file for audit`]);
         const formData = new FormData();
         formData.append('file', file);
         formData.append('provider', provider);
@@ -370,6 +375,7 @@ export default function AuditPage() {
         formData.append('context', context);
         response = await fetch('/api/audit', { method: 'POST', body: formData });
         setPhase('analyzing');
+        setAuditLogs(prev => [...prev, `[phase] Analysis started`]);
       }
 
       if (!response.ok) {
@@ -399,10 +405,13 @@ export default function AuditPage() {
               setFilesScanned(parsed.filesScanned);
               totalScannedTemp = parsed.filesScanned;
               setFileNames(parsed.fileNames || []);
+              setAuditLogs(prev => [...prev, `[meta] Scanned ${parsed.filesScanned} files`]);
             } else if (parsed.type === 'content') {
               accumulated += parsed.text;
               setReportContent(accumulated);
+              setAuditLogs(prev => [...prev, `[content] Received ${parsed.text.length} chars`]);
             } else if (parsed.type === 'error') {
+              setAuditLogs(prev => [...prev, `[error] ${parsed.message}`]);
               throw new Error(parsed.message);
             }
           } catch (e: any) {
@@ -412,6 +421,7 @@ export default function AuditPage() {
       }
 
       setPhase('complete');
+      setAuditLogs(prev => [...prev, `[phase] Audit complete - ${accumulated.length} chars generated`]);
       fetch('/api/save-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -422,6 +432,7 @@ export default function AuditPage() {
       console.error('Audit error:', err);
       setErrorMessage(err.message || 'An unexpected error occurred');
       setPhase('error');
+      setAuditLogs(prev => [...prev, `[error] ${err.message || 'An unexpected error occurred'}`]);
     }
   };
 
@@ -687,6 +698,7 @@ export default function AuditPage() {
   const quickWins = reportSummary.quickWins.filter((item: string) => item.toLowerCase() !== 'none found').slice(0, 3);
 
   return (
+    <>
     <main className="min-h-[100dvh] w-full bg-background text-foreground selection:bg-primary/30 relative overflow-hidden font-sans">
       {/* No full-screen auth gate — sign-in is only triggered on audit button click */}
 
@@ -1501,5 +1513,14 @@ export default function AuditPage() {
       </div>
 
     </main>
+
+    <AIDebugger
+      auditLogs={auditLogs}
+      auditState={{ phase, fileNames, filesScanned, reportLength: reportContent.length }}
+      onPromptAI={async (prompt, context) => {
+        return 'AI Debug Analysis for: ' + prompt;
+      }}
+    />
+    </>
   );
 }
