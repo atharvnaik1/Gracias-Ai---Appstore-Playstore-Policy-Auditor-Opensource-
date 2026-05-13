@@ -8,7 +8,7 @@ AI-powered iOS App Store compliance auditor. Upload your `.ipa` file and get a c
 
 - **IPA Analysis** — Upload `.ipa` files (up to 150MB) for automated compliance auditing
 - **Full Guidelines Coverage** — Checks all 6 major App Store Review Guideline categories: Safety, Performance, Business, Design, Legal & Privacy, and Technical
-- **Multi-Provider AI** — Bring your own key from Anthropic (Claude), OpenAI (GPT), Google Gemini, or OpenRouter
+- **Multi-Provider AI** — Bring your own key from Anthropic (Claude), NVIDIA, OpenAI (GPT), Google Gemini, or OpenRouter
 - **Model Selection** — Choose specific models per provider (Claude Sonnet 4, GPT-4o, Gemini 2.5 Flash, etc.)
 - **Real-Time Streaming** — Watch your audit report generate live as the AI analyzes your code
 - **Export Reports** — Download as Markdown or PDF
@@ -32,7 +32,7 @@ AI-powered iOS App Store compliance auditor. Upload your `.ipa` file and get a c
 
 - Node.js 18+
 - MongoDB URI (Atlas or local)
-- API key from at least one AI provider
+- API key from at least one AI provider: `ANTHROPIC_API_KEY`, `NVIDIA_API_KEY` or `NVIDIA_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, or `OPENROUTER_API_KEY`
 - `unzip` installed on the server/runtime environment
 
 ```bash

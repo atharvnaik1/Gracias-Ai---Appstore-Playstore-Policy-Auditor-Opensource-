@@ -46,6 +46,10 @@ const providerModels: Record<string, { label: string; value: string }[]> = {
     { label: 'Llama 3.1 405B', value: 'meta-llama/llama-3.1-405b-instruct' },
     { label: 'Mixtral 8x22B', value: 'mistralai/mixtral-8x22b-instruct' },
   ],
+  nvidia: [
+    { label: 'Llama 3.1 405B', value: 'meta/llama-3.1-405b-instruct' },
+    { label: 'Llama 3.1 70B', value: 'meta/llama-3.1-70b-instruct' },
+  ],
   ipaship: [
     { label: 'GLM 5.1', value: 'glm-5.1' },
     { label: 'ipaShip AI Core', value: 'meta/llama-3.1-405b-instruct' },
@@ -143,6 +147,7 @@ export default function AuditPage() {
   const [file, setFile] = useState<File | null>(null);
   const [provider, setProvider] = useState('ipaship');
   const [model, setModel] = useState('glm-5.1');
+  const [aiApiKey, setAiApiKey] = useState('');
   const [context, setContext] = useState('');
   const [phase, setPhase] = useState<AuditPhase>('idle');
   const [reportContent, setReportContent] = useState('');
@@ -358,6 +363,7 @@ export default function AuditPage() {
         formData.append('fileName', file.name);
         formData.append('provider', provider);
         formData.append('model', model);
+        formData.append('apiKey', aiApiKey);
         formData.append('context', context);
         response = await fetch('/api/audit', { method: 'POST', body: formData });
       } else {
@@ -367,6 +373,7 @@ export default function AuditPage() {
         formData.append('file', file);
         formData.append('provider', provider);
         formData.append('model', model);
+        formData.append('apiKey', aiApiKey);
         formData.append('context', context);
         response = await fetch('/api/audit', { method: 'POST', body: formData });
         setPhase('analyzing');
@@ -916,6 +923,7 @@ export default function AuditPage() {
                         aria-label="AI provider"
                       >
                         <option value="ipaship">ipaShip AI</option>
+                        <option value="nvidia">NVIDIA</option>
                         <option value="anthropic">Anthropic</option>
                         <option value="openai">OpenAI</option>
                         <option value="gemini">Gemini</option>
@@ -933,6 +941,15 @@ export default function AuditPage() {
                         ))}
                       </select>
                     </div>
+                    <input
+                      value={aiApiKey}
+                      onChange={(e) => setAiApiKey(e.target.value)}
+                      type="password"
+                      placeholder={`${provider === 'nvidia' || provider === 'ipaship' ? 'NVIDIA' : provider === 'anthropic' ? 'Claude' : provider} API key (optional if configured on server)`}
+                      className="w-full rounded-lg border border-[#f4f0e8]/10 bg-[#f4f0e8]/5 px-3 py-2.5 text-xs font-medium text-[#f4f0e8] outline-none transition-colors placeholder:text-[#8b9691] hover:bg-[#f4f0e8]/[0.08] focus:ring-1 focus:ring-[#9be15d]/50"
+                      aria-label="AI API key"
+                      autoComplete="off"
+                    />
 
                     <button
                       type="button"
