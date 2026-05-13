@@ -3,7 +3,7 @@
 AI-powered iOS App Store compliance auditor. Upload your `.ipa` file and get a comprehensive audit against Apple's Review Guidelines — before you submit.
 
 **Live at: [ipaship.com](https://ipaship.com)**
-
+<iframe src="https://github.com/sponsors/atharvnaik1/button" title="Sponsor atharvnaik1" height="32" width="114" style="border: 0; border-radius: 6px;"></iframe>
 ## Features
 
 - **IPA Analysis** — Upload `.ipa` files (up to 150MB) for automated compliance auditing
