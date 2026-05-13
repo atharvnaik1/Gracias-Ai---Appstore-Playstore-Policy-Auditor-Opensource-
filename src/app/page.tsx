@@ -729,6 +729,9 @@ export default function AuditPage() {
                       {item}
                     </a>
                   ))}
+                  <Link href="/compare-prs" className="px-3 py-2 text-sm font-medium text-[#8b9691] hover:text-[#f4f0e8] transition-all">
+                    Compare PRs
+                  </Link>
                 </div>
               </nav>
 
@@ -808,6 +811,7 @@ export default function AuditPage() {
                     <a href="#audit" className="transition-colors hover:text-[#f4f0e8]">Audit</a>
                     <a href="#security" className="transition-colors hover:text-[#f4f0e8]">Security</a>
                     <a href="#open-source" className="transition-colors hover:text-[#f4f0e8]">Open Source</a>
+                    <Link href="/compare-prs" className="transition-colors hover:text-[#f4f0e8]">Compare PRs</Link>
                     <span className="h-8 w-px bg-[#f4f0e8]/20" />
                     <span className="grid h-7 w-7 place-items-center rounded-full border border-[#f4f0e8]/25">
                       <span className="h-2 w-2 rounded-full bg-[#9be15d] shadow-[0_0_18px_rgba(155,225,93,0.75)]" />
