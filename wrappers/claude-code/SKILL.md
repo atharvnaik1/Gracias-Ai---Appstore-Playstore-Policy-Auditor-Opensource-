@@ -1,11 +1,10 @@
 ---
-name: ipaship-appstore-compliance-auditor
+name: ipaship-audit
 description: Use when auditing iOS/Android app submissions for compliance with Apple App Store Review Guidelines or Google Play Developer Policies. Scan .ipa, .apk, or .zip files against official store policies, generate structured compliance reports, and identify violations with remediation steps.
 tags: [app-store, compliance, audit, ios, android, apple, google-play, app-review]
 ---
 
-# ipaShip — App Store Compliance Auditor
-
+# ipaShip — ipaship-audit
 Audit your iOS/Android app packages against official store policies before submission. Upload `.ipa` or `.apk` files and get a structured compliance report with guideline references, severity ratings, and actionable fixes.
 
 ## When to Use
@@ -157,6 +156,6 @@ After setting up:
 ## References
 
 - [ipaShip Website](https://ipaship.com)
-- [GitHub Repository](https://github.com/atharvnaik1/ipaship-app-reviewer)
+- [GitHub Repository](https://github.com/atharvnaik1/ipaship-audit)
 - [Apple App Store Review Guidelines](https://developer.apple.com/app-store/review/guidelines/)
 - [Google Play Developer Policy](https://play.google.com/about/developer-content-policy/)
