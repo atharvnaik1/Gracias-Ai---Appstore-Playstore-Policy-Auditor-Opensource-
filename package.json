@@ -2,6 +2,9 @@
   "name": "ipaship",
   "version": "1.0.0",
   "main": "index.js",
+  "bin": {
+    "ipaship": "scripts/ipaship-cli.js"
+  },
   "engines": {
     "node": ">=20"
   },
