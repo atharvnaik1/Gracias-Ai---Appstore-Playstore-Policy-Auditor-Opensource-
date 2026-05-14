@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60" fill="none">
+  <defs>
+    <linearGradient id="shieldGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#1D4ED8"/>
+    </linearGradient>
+    <linearGradient id="rocketGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#60A5FA"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+  <!-- Shield icon -->
+  <g transform="translate(6, 6)">
+    <!-- Shield body -->
+    <path d="M24 2 L44 10 L44 26 C44 38 35 46 24 50 C13 46 4 38 4 26 L4 10 Z" fill="url(#shieldGrad)" stroke="#1E40AF" stroke-width="1.5" rx="4"/>
+    <!-- Rocket/ship silhouette inside shield -->
+    <path d="M24 12 C24 12 18 18 18 26 L22 26 L20 34 L24 30 L28 34 L26 26 L30 26 C30 18 24 12 24 12Z" fill="white" opacity="0.95"/>
+    <!-- Checkmark -->
+    <path d="M17 24 L22 29 L31 18" stroke="#FCD34D" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <!-- Text: ipaship -->
+  <text x="58" y="40" font-family="'SF Pro Display', 'Inter', 'Segoe UI', system-ui, sans-serif" font-size="32" font-weight="700" fill="#1E3A5F" letter-spacing="-0.5">
+    <tspan fill="#3B82F6">ipa</tspan><tspan fill="#1E3A5F">Ship</tspan>
+  </text>
+</svg>
