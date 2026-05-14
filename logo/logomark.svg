@@ -1,0 +1,32 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Gracias AI logomark</title>
+  <desc id="desc">Rounded gradient app tile with an audit shield, neural nodes, and compliance checkmark.</desc>
+  <defs>
+    <linearGradient id="tile" x1="40" y1="28" x2="216" y2="228" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#a855f7"/>
+      <stop offset="0.56" stop-color="#7c5cf4"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="shield" x1="82" y1="64" x2="174" y2="180" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#eaf2ff"/>
+    </linearGradient>
+    <filter id="softShadow" x="28" y="24" width="208" height="216" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#1f2a44" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+  <rect x="28" y="24" width="200" height="208" rx="48" fill="url(#tile)" filter="url(#softShadow)"/>
+  <path d="M128 60L178 79V121C178 153 158 181 128 194C98 181 78 153 78 121V79L128 60Z" fill="url(#shield)" fill-opacity="0.96"/>
+  <path d="M128 74L164 88V120C164 145 150 166 128 178C106 166 92 145 92 120V88L128 74Z" fill="#0b1220" fill-opacity="0.08"/>
+  <path d="M104 124L121 141L153 105" stroke="#ffffff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M104 124L121 141L153 105" stroke="#3b82f6" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M104 91L126 107L151 91" stroke="#a855f7" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M104 91L101 119M151 91L156 119M126 107V137" stroke="#3b82f6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.78"/>
+  <circle cx="104" cy="91" r="7" fill="#a855f7" stroke="#ffffff" stroke-width="4"/>
+  <circle cx="151" cy="91" r="7" fill="#3b82f6" stroke="#ffffff" stroke-width="4"/>
+  <circle cx="126" cy="107" r="7" fill="#815df5" stroke="#ffffff" stroke-width="4"/>
+  <circle cx="101" cy="119" r="5" fill="#3b82f6"/>
+  <circle cx="156" cy="119" r="5" fill="#a855f7"/>
+  <circle cx="126" cy="137" r="5" fill="#3b82f6"/>
+  <path d="M64 55H82M55 64V82M174 199H192M201 174V192" stroke="#ffffff" stroke-width="7" stroke-linecap="round" opacity="0.72"/>
+</svg>
