@@ -1,0 +1,28 @@
+<svg width="960" height="260" viewBox="0 0 960 260" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Gracias AI wordmark for dark backgrounds</title>
+  <desc id="desc">Gracias AI wordmark with the shield logomark and white text for dark backgrounds.</desc>
+  <defs>
+    <linearGradient id="brandGradient" x1="48" y1="34" x2="216" y2="218" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#A855F7"/>
+      <stop offset="1" stop-color="#3B82F6"/>
+    </linearGradient>
+    <linearGradient id="markGradient" x1="84" y1="92" x2="170" y2="168" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#A855F7"/>
+      <stop offset="1" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+
+  <g>
+    <path d="M132 28C164.3 42.2 192.2 46.7 218 53.8V114.8C218 165.7 186.3 206.8 132 235.7C77.7 206.8 46 165.7 46 114.8V53.8C71.8 46.7 99.7 42.2 132 28Z" fill="url(#brandGradient)"/>
+    <path d="M132 48C158.5 59.6 181.7 63.5 203 69.2V115.6C203 158.7 176.2 193 132 217.2C87.8 193 61 158.7 61 115.6V69.2C82.3 63.5 105.5 59.6 132 48Z" stroke="white" stroke-opacity="0.34" stroke-width="5"/>
+    <rect x="80" y="72" width="104" height="104" rx="27" fill="white" fill-opacity="0.96"/>
+    <path d="M106 130.5L124 148.5L162 106.5" stroke="url(#markGradient)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="166" cy="154" r="6.5" fill="#3B82F6"/>
+    <circle cx="101" cy="102" r="5.5" fill="#A855F7"/>
+    <path d="M168 87L172.2 96.2L181.5 100.5L172.2 104.8L168 114L163.8 104.8L154.5 100.5L163.8 96.2L168 87Z" fill="url(#markGradient)"/>
+  </g>
+
+  <text x="270" y="119" fill="#FFFFFF" font-family="Inter, SF Pro Display, Segoe UI, Arial, sans-serif" font-size="62" font-weight="760">Gracias AI</text>
+  <text x="274" y="169" fill="#CBD5E1" font-family="Inter, SF Pro Text, Segoe UI, Arial, sans-serif" font-size="24" font-weight="540">App Store compliance auditor</text>
+  <rect x="273" y="191" width="152" height="6" rx="3" fill="url(#brandGradient)"/>
+</svg>

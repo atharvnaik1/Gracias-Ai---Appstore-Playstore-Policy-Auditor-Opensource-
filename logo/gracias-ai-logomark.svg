@@ -1,0 +1,37 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Gracias AI logomark</title>
+  <desc id="desc">A purple and blue shield containing a rounded app tile, audit checkmark, and AI sparkle.</desc>
+  <defs>
+    <linearGradient id="brandGradient" x1="104" y1="68" x2="428" y2="424" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#A855F7"/>
+      <stop offset="1" stop-color="#3B82F6"/>
+    </linearGradient>
+    <linearGradient id="markGradient" x1="174" y1="180" x2="340" y2="324" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#A855F7"/>
+      <stop offset="1" stop-color="#3B82F6"/>
+    </linearGradient>
+    <filter id="softShadow" x="40" y="32" width="432" height="456" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="22" stdDeviation="18" flood-color="#1E1B4B" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <path
+    d="M256 52C319.2 79.8 374.1 88.6 424 102.4V222.6C424 322.2 362.1 402.8 256 459.7C149.9 402.8 88 322.2 88 222.6V102.4C137.9 88.6 192.8 79.8 256 52Z"
+    fill="url(#brandGradient)"
+    filter="url(#softShadow)"
+  />
+  <path
+    d="M256 88C309.2 111.4 355.4 118.8 397.5 130.4V224.3C397.5 309.8 344.1 378 256 426.7C167.9 378 114.5 309.8 114.5 224.3V130.4C156.6 118.8 202.8 111.4 256 88Z"
+    stroke="white"
+    stroke-opacity="0.34"
+    stroke-width="8"
+  />
+
+  <rect x="154" y="138" width="204" height="204" rx="52" fill="white" fill-opacity="0.96"/>
+  <path d="M204 252.5L238.8 287.3L312 206" stroke="url(#markGradient)" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="319" cy="297" r="13" fill="#3B82F6"/>
+  <circle cx="195" cy="197" r="10" fill="#A855F7"/>
+  <path d="M322 166L330.5 184.5L349 193L330.5 201.5L322 220L313.5 201.5L295 193L313.5 184.5L322 166Z" fill="url(#markGradient)"/>
+  <path d="M196 197H232" stroke="#A855F7" stroke-width="10" stroke-linecap="round" opacity="0.34"/>
+  <path d="M319 297H282" stroke="#3B82F6" stroke-width="10" stroke-linecap="round" opacity="0.34"/>
+</svg>
