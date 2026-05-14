@@ -284,6 +284,29 @@ function sanitizeContext(context: string): string {
   return context.slice(0, 2000);
 }
 
+function resolveProviderApiKey(provider: string, submittedApiKey: string): string {
+  const key = submittedApiKey.trim();
+  if (key) return key;
+
+  if (provider === 'nvidia' || provider === 'ipaship') {
+    return (process.env.NVIDIA_KEY || process.env.NEXT_PUBLIC_API_KEY || '').trim();
+  }
+  if (provider === 'anthropic') {
+    return (process.env.ANTHROPIC_API_KEY || process.env.NEXT_PUBLIC_API_KEY || '').trim();
+  }
+  if (provider === 'openai') {
+    return (process.env.OPENAI_API_KEY || process.env.NEXT_PUBLIC_API_KEY || '').trim();
+  }
+  if (provider === 'gemini') {
+    return (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.NEXT_PUBLIC_API_KEY || '').trim();
+  }
+  if (provider === 'openrouter') {
+    return (process.env.OPENROUTER_API_KEY || process.env.NEXT_PUBLIC_API_KEY || '').trim();
+  }
+
+  return '';
+}
+
 function buildAuditPrompt(
   files: SourceFile[],
   context: string,
@@ -481,7 +504,17 @@ export async function POST(req: NextRequest) {
 
     // Stream-parse the multipart upload — writes file directly to disk
     // without ever loading the full file into memory
-    const { filePath, fileName, provider, model, context } = await parseMultipartStream(req, tempDir);
+    const { filePath, fileName, apiKey, provider, model, context } = await parseMultipartStream(req, tempDir);
+
+    const VALID_PROVIDERS = new Set(['nvidia', 'ipaship', 'anthropic', 'openai', 'gemini', 'openrouter']);
+    if (!VALID_PROVIDERS.has(provider)) {
+      return NextResponse.json({ error: `Invalid provider: ${provider}` }, { status: 400 });
+    }
+
+    const resolvedApiKey = resolveProviderApiKey(provider, apiKey);
+    if (!resolvedApiKey) {
+      return NextResponse.json({ error: `API key is required for ${provider}. Enter one in the form or configure the matching server environment variable.` }, { status: 400 });
+    }
 
     // Only accept .ipa, .apk, .zip files
     const ext = path.extname(fileName).toLowerCase();
@@ -515,31 +548,13 @@ export async function POST(req: NextRequest) {
     let headers: Record<string, string> = { 'Content-Type': 'application/json' };
     let payload: any = {};
 
-    const VALID_PROVIDERS = new Set(['ipaship', 'anthropic', 'openai', 'gemini', 'openrouter']);
-    if (!VALID_PROVIDERS.has(provider)) {
-      return NextResponse.json({ error: `Invalid provider: ${provider}` }, { status: 400 });
-    }
-
-    const providerApiKeys: Record<string, string | undefined> = {
-      ipaship: process.env.NVIDIA_KEY || process.env.NEXT_PUBLIC_API_KEY,
-      anthropic: process.env.ANTHROPIC_API_KEY,
-      openai: process.env.OPENAI_API_KEY,
-      gemini: process.env.GEMINI_API_KEY,
-      openrouter: process.env.OPENROUTER_API_KEY,
-    };
-    const resolvedApiKey = providerApiKeys[provider] || '';
-
-    if (!resolvedApiKey.trim()) {
-      return NextResponse.json({ error: `API key is required for ${provider} in environment variables` }, { status: 500 });
-    }
-
     // AbortController to cancel AI request if client disconnects
     const abortController = new AbortController();
     req.signal.addEventListener('abort', () => abortController.abort());
 
     if (provider === 'anthropic') {
       apiUrl = 'https://api.anthropic.com/v1/messages';
-      headers['x-api-key'] = resolvedApiKey.trim();
+      headers['x-api-key'] = resolvedApiKey;
       headers['anthropic-version'] = '2023-06-01';
       payload = {
         model: model || 'claude-3-5-sonnet-20241022',
@@ -551,7 +566,7 @@ export async function POST(req: NextRequest) {
     } else if (provider === 'gemini') {
       const modelId = model || 'gemini-2.5-flash';
       apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:streamGenerateContent?alt=sse`;
-      headers['x-goog-api-key'] = resolvedApiKey.trim();
+      headers['x-goog-api-key'] = resolvedApiKey;
       payload = {
         systemInstruction: { parts: [{ text: systemPrompt }] },
         contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
@@ -559,7 +574,7 @@ export async function POST(req: NextRequest) {
       };
     } else if (provider === 'openrouter') {
       apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
-      headers['Authorization'] = `Bearer ${resolvedApiKey.trim()}`;
+      headers['Authorization'] = `Bearer ${resolvedApiKey}`;
       headers['HTTP-Referer'] = 'https://ipaship.com';
       headers['X-Title'] = 'App Store Compliance Auditor';
       payload = {
@@ -571,10 +586,10 @@ export async function POST(req: NextRequest) {
           { role: 'user', content: userPrompt },
         ],
       };
-    } else if (provider === 'ipaship') {
+    } else if (provider === 'ipaship' || provider === 'nvidia') {
       // ipaShip AI uses NVIDIA NIM endpoints natively
       apiUrl = 'https://integrate.api.nvidia.com/v1/chat/completions';
-      headers['Authorization'] = `Bearer ${resolvedApiKey.trim()}`;
+      headers['Authorization'] = `Bearer ${resolvedApiKey}`;
       payload = {
         model: model || 'meta/llama-3.1-405b-instruct',
         max_tokens: 4096,
@@ -587,7 +602,7 @@ export async function POST(req: NextRequest) {
     } else {
       // OpenAI
       apiUrl = 'https://api.openai.com/v1/chat/completions';
-      headers['Authorization'] = `Bearer ${resolvedApiKey.trim()}`;
+      headers['Authorization'] = `Bearer ${resolvedApiKey}`;
       payload = {
         model: model || 'gpt-4o',
         max_tokens: 16384,
