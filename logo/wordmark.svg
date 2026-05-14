@@ -1,0 +1,28 @@
+<svg width="640" height="180" viewBox="0 0 640 180" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Gracias AI wordmark</title>
+  <desc id="desc">Gracias AI wordmark with a shield and neural compliance logomark.</desc>
+  <defs>
+    <linearGradient id="tile" x1="18" y1="18" x2="146" y2="162" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#a855f7"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="word" x1="184" y1="42" x2="492" y2="119" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111827"/>
+      <stop offset="1" stop-color="#1d4ed8"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="18" y="18" width="144" height="144" rx="38" fill="url(#tile)"/>
+  <path d="M90 36 129 50v31c0 27-14 51-39 67-25-16-39-40-39-67V50l39-14Z" fill="#ffffff"/>
+  <path d="M90 36v112c25-16 39-40 39-67V50L90 36Z" fill="#dbeafe"/>
+  <path d="M65 68h50M65 86h50M65 104h50" stroke="#93c5fd" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="69" cy="68" r="6" fill="#a855f7"/>
+  <circle cx="111" cy="68" r="6" fill="#3b82f6"/>
+  <circle cx="90" cy="86" r="7" fill="#7c3aed"/>
+  <circle cx="69" cy="104" r="6" fill="#3b82f6"/>
+  <circle cx="111" cy="104" r="6" fill="#a855f7"/>
+  <path d="m72 118 13 13 25-30" stroke="#16a34a" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <text x="190" y="94" fill="url(#word)" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="58" font-weight="800">Gracias AI</text>
+  <text x="193" y="126" fill="#475569" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="18" font-weight="600" letter-spacing="2">APP STORE COMPLIANCE AUDITOR</text>
+</svg>
