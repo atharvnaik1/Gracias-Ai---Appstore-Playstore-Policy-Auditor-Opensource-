@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Gracias AI logomark</title>
+  <desc id="desc">Rounded app tile with an AI network, shield, and policy check mark.</desc>
+  <defs>
+    <linearGradient id="tileGradient" x1="84" y1="52" x2="430" y2="458" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#a855f7"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="checkGradient" x1="202" y1="300" x2="322" y2="222" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#a855f7"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+    <filter id="softShadow" x="20" y="24" width="472" height="480" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#172554" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="120" fill="#ffffff"/>
+  <g filter="url(#softShadow)">
+    <rect x="56" y="48" width="400" height="416" rx="104" fill="url(#tileGradient)"/>
+  </g>
+  <path d="M256 110c47 32 86 40 124 40v104c0 75-49 124-124 158-75-34-124-83-124-158V150c38 0 77-8 124-40Z" fill="#ffffff" fill-opacity="0.92"/>
+  <path d="M256 136c37 24 69 31 99 32v83c0 58-36 96-99 126-63-30-99-68-99-126v-83c30-1 62-8 99-32Z" fill="#ffffff"/>
+  <path d="M208 262h96" stroke="#c4b5fd" stroke-width="16" stroke-linecap="round"/>
+  <path d="M232 214l48 96" stroke="#93c5fd" stroke-width="16" stroke-linecap="round"/>
+  <path d="M280 214l-48 96" stroke="#93c5fd" stroke-width="16" stroke-linecap="round"/>
+  <circle cx="208" cy="262" r="21" fill="#a855f7"/>
+  <circle cx="256" cy="214" r="21" fill="#7c3aed"/>
+  <circle cx="304" cy="262" r="21" fill="#3b82f6"/>
+  <circle cx="256" cy="310" r="21" fill="#2563eb"/>
+  <path d="M218 304l32 32 62-74" fill="none" stroke="url(#checkGradient)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
