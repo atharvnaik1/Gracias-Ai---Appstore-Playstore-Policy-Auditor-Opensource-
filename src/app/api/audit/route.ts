@@ -481,7 +481,7 @@ export async function POST(req: NextRequest) {
 
     // Stream-parse the multipart upload — writes file directly to disk
     // without ever loading the full file into memory
-    const { filePath, fileName, provider, model, context } = await parseMultipartStream(req, tempDir);
+    const { filePath, fileName, apiKey, provider, model, context } = await parseMultipartStream(req, tempDir);
 
     // Only accept .ipa, .apk, .zip files
     const ext = path.extname(fileName).toLowerCase();
@@ -515,22 +515,23 @@ export async function POST(req: NextRequest) {
     let headers: Record<string, string> = { 'Content-Type': 'application/json' };
     let payload: any = {};
 
-    const VALID_PROVIDERS = new Set(['ipaship', 'anthropic', 'openai', 'gemini', 'openrouter']);
+    const VALID_PROVIDERS = new Set(['ipaship', 'nvidia', 'anthropic', 'openai', 'gemini', 'openrouter']);
     if (!VALID_PROVIDERS.has(provider)) {
       return NextResponse.json({ error: `Invalid provider: ${provider}` }, { status: 400 });
     }
 
     const providerApiKeys: Record<string, string | undefined> = {
-      ipaship: process.env.NVIDIA_KEY || process.env.NEXT_PUBLIC_API_KEY,
+      ipaship: process.env.NVIDIA_API_KEY || process.env.NVIDIA_KEY || process.env.NEXT_PUBLIC_API_KEY,
+      nvidia: process.env.NVIDIA_API_KEY || process.env.NVIDIA_KEY || process.env.NEXT_PUBLIC_API_KEY,
       anthropic: process.env.ANTHROPIC_API_KEY,
       openai: process.env.OPENAI_API_KEY,
       gemini: process.env.GEMINI_API_KEY,
       openrouter: process.env.OPENROUTER_API_KEY,
     };
-    const resolvedApiKey = providerApiKeys[provider] || '';
+    const resolvedApiKey = apiKey || providerApiKeys[provider] || '';
 
     if (!resolvedApiKey.trim()) {
-      return NextResponse.json({ error: `API key is required for ${provider} in environment variables` }, { status: 500 });
+      return NextResponse.json({ error: `API key is required for ${provider} in the request or environment variables` }, { status: 500 });
     }
 
     // AbortController to cancel AI request if client disconnects
@@ -571,8 +572,8 @@ export async function POST(req: NextRequest) {
           { role: 'user', content: userPrompt },
         ],
       };
-    } else if (provider === 'ipaship') {
-      // ipaShip AI uses NVIDIA NIM endpoints natively
+    } else if (provider === 'ipaship' || provider === 'nvidia') {
+      // ipaShip AI and the NVIDIA provider use NVIDIA NIM endpoints natively.
       apiUrl = 'https://integrate.api.nvidia.com/v1/chat/completions';
       headers['Authorization'] = `Bearer ${resolvedApiKey.trim()}`;
       payload = {

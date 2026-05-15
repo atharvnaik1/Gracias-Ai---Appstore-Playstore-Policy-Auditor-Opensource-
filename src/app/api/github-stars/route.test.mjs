@@ -13,12 +13,14 @@ test('GitHub stars route uses an owner/repo API URL for this repository', () => 
 });
 
 test('audit route resolves API keys from the selected provider env var', () => {
-  for (const envName of ['NVIDIA_KEY', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY']) {
+  for (const envName of ['NVIDIA_API_KEY', 'NVIDIA_KEY', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY']) {
     assert.match(auditRouteSource, new RegExp(`process\\.env\\.${envName}`));
   }
 
   assert.match(auditRouteSource, /providerApiKeys\[provider\]/);
-  assert.match(auditRouteSource, /API key is required for \$\{provider\}/);
+  assert.match(auditRouteSource, /apiKey \|\| providerApiKeys\[provider\]/);
+  assert.match(auditRouteSource, /provider === 'ipaship' \|\| provider === 'nvidia'/);
+  assert.match(auditRouteSource, /API key is required for \$\{provider\} in the request or environment variables/);
 });
 
 test('audit prompt enforces evidence-led reviewer output', () => {
