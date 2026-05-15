@@ -298,6 +298,8 @@ function buildAuditPrompt(
 
 Write like a senior app review consultant: precise, evidence-led, direct, and useful to engineers. Do not use filler, generic best-practice advice, marketing language, or unsupported claims.
 
+Write like a senior store-review consultant briefing a product engineering team: precise, evidence-backed, and focused on what must change before submission. Every FAIL or WARN must cite actual file evidence, name the relevant policy area, and include one concrete developer action.
+
 Your task is to analyze source code files provided by the user and generate a ${storeName} compliance audit report. Base your analysis ONLY on the actual code provided. If the retrieved code does not contain enough evidence for a check, mark it N/A or WARN and explain exactly what evidence is missing.
 
 You MUST follow the exact markdown structure specified. Every compliance check must use the blockquote format with STATUS, Guideline, Finding, File(s), and Action fields. The dashboard table must have accurate counts matching the checks below it, and the remediation table must include every WARN/FAIL item.
@@ -316,8 +318,12 @@ Generate a thorough **${storeName} Compliance Audit Report**. You MUST follow th
 Report quality rules:
 
 - Use only the required sections and tables below.
+- Do not include generic checklist advice unless it is tied to a cited file or explicitly marked N/A.
+- Do not invent line numbers. If a line number is unavailable, cite the file path only or write \`Not found in retrieved files\`.
+- Prefer one specific remediation action over broad advice.
+- Separate submission-blocking risks from polish or best-practice improvements.
+- Keep the executive summary and remediation notes concise enough for a developer to act on immediately.
 - Keep findings concise, specific, and actionable.
-- Cite concrete files and line numbers when available; otherwise write \`Not found in retrieved files\`.
 - Do not invent product behavior, policies, permissions, or data collection that is not visible in the code.
 - For PASS items, state the evidence that supports the pass.
 - For WARN/FAIL items, include one concrete developer action and mirror that item in the remediation table.
@@ -381,7 +387,11 @@ For each finding, format EVERY check as a blockquote exactly like this:
 >
 > **Action:** [What to do — skip this line if PASS]
 
-Use statuses: **PASS**, **WARN**, **FAIL**, **N/A**
+Use statuses precisely:
+- **FAIL** means the evidence suggests a likely store rejection or policy violation.
+- **WARN** means the evidence shows a material submission risk, but not a certain rejection.
+- **PASS** means the reviewed files include evidence that the app satisfies the check.
+- **N/A** means the supplied files do not contain enough evidence to assess the check.
 
 ${isAndroid ? `### 1. Restricted Content & Safety
 - Objectionable content filters
@@ -450,6 +460,17 @@ List all issues found above, sorted by severity. Use EXACTLY this table format:
 Severity levels: **CRITICAL**, **HIGH**, **MEDIUM**, **LOW**
 
 After the table, provide a brief paragraph summarizing the remediation priority.
+
+Then provide executable GitHub issue drafts for the top CRITICAL/HIGH items, up to 5 total. Use exactly this format for each draft:
+
+### GitHub Issue Draft: [short issue title]
+
+**Why it matters:** [store policy risk in one sentence]
+**Files:** [file paths from the evidence]
+**Acceptance Criteria:**
+- [developer-verifiable outcome]
+- [developer-verifiable outcome]
+**Implementation Notes:** [specific implementation guidance]
 
 ---
 
