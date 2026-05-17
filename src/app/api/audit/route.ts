@@ -284,6 +284,38 @@ function sanitizeContext(context: string): string {
   return context.slice(0, 2000);
 }
 
+function extractStreamText(provider: string, parsed: any): string {
+  if (!parsed || typeof parsed !== 'object') return '';
+
+  if (provider === 'anthropic') {
+    return parsed.delta?.text || '';
+  }
+
+  if (provider === 'gemini') {
+    const parts = parsed.candidates?.[0]?.content?.parts;
+    if (Array.isArray(parts)) {
+      return parts
+        .map((part: any) => (typeof part?.text === 'string' ? part.text : ''))
+        .join('');
+    }
+    return '';
+  }
+
+  const content = parsed.choices?.[0]?.delta?.content;
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((part: any) => {
+        if (typeof part === 'string') return part;
+        if (typeof part?.text === 'string') return part.text;
+        return '';
+      })
+      .join('');
+  }
+
+  return '';
+}
+
 function buildAuditPrompt(
   files: SourceFile[],
   context: string,
@@ -603,6 +635,7 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
+      signal: abortController.signal,
     });
 
     if (!response.ok) {
@@ -615,7 +648,11 @@ export async function POST(req: NextRequest) {
         const reader = response.body!.getReader();
         const decoder = new TextDecoder();
 
-        controller.enqueue(encoder.encode(JSON.stringify({ type: 'meta', filesScanned: files.length }) + '\n'));
+        controller.enqueue(encoder.encode(JSON.stringify({
+          type: 'meta',
+          filesScanned: files.length,
+          fileNames: files.slice(0, 100).map(file => file.path),
+        }) + '\n'));
 
         try {
           let buffer = '';
@@ -633,7 +670,7 @@ export async function POST(req: NextRequest) {
                 if (data === '[DONE]') continue;
                 try {
                   const parsed = JSON.parse(data);
-                  const textFragment = parsed.delta?.text || '';
+                  const textFragment = extractStreamText(provider, parsed);
                   if (textFragment) {
                     controller.enqueue(encoder.encode(JSON.stringify({ type: 'content', text: textFragment }) + '\n'));
                   }
