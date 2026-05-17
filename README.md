@@ -59,6 +59,12 @@ npm run dev
 
 Open [http://localhost:8080](http://localhost:8080) in your browser.
 
+## Claude Code Skill
+
+This repository includes a project skill at `.claude/skills/ipaship-app-review/SKILL.md` for Claude Code users.
+
+From the repository root, Claude Code can load the skill when you ask for ipaShip audit help, App Store review preparation, report triage, wrapper usage, or remediation planning.
+
 ### Production Build
 
 ```bash
