@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640" role="img" aria-labelledby="title desc">
+  <title id="title">ipaShip logo preview sheet</title>
+  <desc id="desc">Preview sheet showing the ipaShip logo package on light and dark backgrounds.</desc>
+  <defs>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#a855f7"/>
+      <stop offset="0.48" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#9be15d"/>
+    </linearGradient>
+    <style>
+      .label { font: 700 18px Inter, ui-sans-serif, system-ui, sans-serif; letter-spacing: 1.6px; }
+      .name { font: 900 44px Inter, ui-sans-serif, system-ui, sans-serif; letter-spacing: -1.5px; }
+      .sub { font: 800 13px Inter, ui-sans-serif, system-ui, sans-serif; letter-spacing: 2px; }
+    </style>
+  </defs>
+  <rect width="960" height="640" fill="#f7f7f2"/>
+  <rect x="48" y="54" width="864" height="238" rx="28" fill="#ffffff"/>
+  <rect x="48" y="348" width="864" height="238" rx="28" fill="#050606"/>
+  <text class="label" x="78" y="104" fill="#52605a">LIGHT BACKGROUND</text>
+  <text class="label" x="78" y="398" fill="#9aa59f">DARK BACKGROUND</text>
+  <g transform="translate(92 126) scale(.5)">
+    <rect x="16" y="16" width="224" height="224" rx="52" fill="url(#brand)"/>
+    <path d="M128 44 194 70v51c0 43-25 75-66 92-41-17-66-49-66-92V70l66-26Z" fill="#ffffff"/>
+    <path d="M87 119c21-11 49-13 82-8M92 143c24-8 49-7 77 4" fill="none" stroke="#3b82f6" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="92" cy="119" r="8" fill="#050606"/><circle cx="169" cy="111" r="8" fill="#050606"/><circle cx="92" cy="143" r="8" fill="#050606"/><circle cx="169" cy="147" r="8" fill="#050606"/>
+    <path d="m105 137 18 18 37-43" fill="none" stroke="#9be15d" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text class="name" x="252" y="187" fill="#050606">ipaShip</text>
+  <text class="sub" x="254" y="219" fill="#3b82f6">APP STORE COMPLIANCE AUDITOR</text>
+  <path d="M254 238h132" stroke="#9be15d" stroke-width="4" stroke-linecap="round"/>
+  <g transform="translate(92 420) scale(.5)">
+    <rect x="16" y="16" width="224" height="224" rx="52" fill="url(#brand)"/>
+    <path d="M128 44 194 70v51c0 43-25 75-66 92-41-17-66-49-66-92V70l66-26Z" fill="#f4f0e8"/>
+    <path d="M87 119c21-11 49-13 82-8M92 143c24-8 49-7 77 4" fill="none" stroke="#3b82f6" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="92" cy="119" r="8" fill="#050606"/><circle cx="169" cy="111" r="8" fill="#050606"/><circle cx="92" cy="143" r="8" fill="#050606"/><circle cx="169" cy="147" r="8" fill="#050606"/>
+    <path d="m105 137 18 18 37-43" fill="none" stroke="#9be15d" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text class="name" x="252" y="481" fill="#f4f0e8">ipaShip</text>
+  <text class="sub" x="254" y="513" fill="#9be15d">APP STORE COMPLIANCE AUDITOR</text>
+  <path d="M254 532h132" stroke="#3b82f6" stroke-width="4" stroke-linecap="round"/>
+  <text x="660" y="254" fill="#52605a" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14">Shield = audit trust</text>
+  <text x="660" y="274" fill="#52605a" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14">Launch trail = ship faster</text>
+  <text x="660" y="548" fill="#9aa59f" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14">Checkmark = policy readiness</text>
+  <text x="660" y="568" fill="#9aa59f" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14">Nodes = AI review graph</text>
+</svg>
