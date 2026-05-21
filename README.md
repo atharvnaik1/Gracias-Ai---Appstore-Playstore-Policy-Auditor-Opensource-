@@ -85,6 +85,18 @@ npm start
 
 ipaShip provides ready-to-use boilerplate SDKs and wrappers for various ecosystems and languages. You can find them in the `wrappers/` directory. Each wrapper is skeletoned to pragmatically audit your `.ipa` files directly from your CI/CD pipelines, backend backend, or build environments!
 
+## Claude Code Skill
+
+This repository includes a project skill at `.claude/skills/ipaship-app-reviewer/SKILL.md` so Claude Code can guide ipaShip audits directly from the repo context.
+
+To use it:
+
+```bash
+claude
+```
+
+Then ask Claude Code to use the `ipaship-app-reviewer` skill to audit an `.ipa`, `.apk`, or source `.zip`, interpret an exported report, or prepare store-compliance remediation steps.
+
 ### Commands to Run Wrappers
 
 Here are quick commands to interact with the given wrappers:
