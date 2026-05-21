@@ -50,6 +50,22 @@ const SKIP_DIRS = new Set([
 const MAX_FILE_SIZE = 50_000; // 50KB per individual source file
 const MAX_TOTAL_CONTENT = 350_000; // 350KB total context (roughly ~90k tokens max)
 
+function sanitizeUploadFileName(filename: string): string {
+  const baseName = path.basename(filename || 'upload.ipa');
+  const safeName = baseName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 255);
+  return safeName || 'upload.ipa';
+}
+
+function resolveUploadedFilePath(fileId: string, fileName: string): string {
+  const safeFileId = path.basename(fileId);
+  if (!safeFileId.startsWith('gracias-upload-') || safeFileId !== fileId) {
+    throw new Error('Invalid uploaded file reference');
+  }
+
+  const uploadDir = path.join(os.tmpdir(), safeFileId);
+  return path.join(uploadDir, sanitizeUploadFileName(fileName));
+}
+
 function getClientKey(req: NextRequest): string {
   const forwarded = req.headers.get('x-forwarded-for');
   if (forwarded) {
@@ -128,7 +144,7 @@ function parseMultipartStream(
         return;
       }
 
-      fileName = info.filename || 'upload.ipa';
+      fileName = sanitizeUploadFileName(info.filename);
       filePath = path.join(tempDir, fileName);
       fileReceived = true;
 
@@ -179,7 +195,7 @@ function parseMultipartStream(
         return;
       }
       if (!fileReceived && fileId) {
-        filePath = path.join(os.tmpdir(), fileId, fileName);
+        filePath = resolveUploadedFilePath(fileId, fileName);
         fileReceived = true;
         writeFinished = true;
       }
