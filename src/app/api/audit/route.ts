@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { execFile } from 'child_process';
 import { promises as fs, createWriteStream } from 'fs';
 import path from 'path';
 import os from 'os';
-import { promisify } from 'util';
 import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
 import Busboy from 'busboy';
+import yauzl from 'yauzl';
 import { LRUCache } from 'lru-cache';
 import { buildRetrievedContext, type SourceFile } from '../../../utils/audit-retrieval';
-
-const execFileAsync = promisify(execFile);
 
 // Basic in-memory rate limiter using LRU Cache for DDoS protection
 const rateLimitCache = new LRUCache<string, number>({
@@ -276,6 +274,90 @@ async function collectFiles(dir: string, basePath: string = ''): Promise<{ path:
   return files;
 }
 
+function isPathInsideDirectory(parentDir: string, childPath: string): boolean {
+  const relative = path.relative(parentDir, childPath);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
+async function extractArchive(filePath: string, extractDir: string): Promise<void> {
+  const extractRoot = path.resolve(extractDir);
+  await fs.mkdir(extractRoot, { recursive: true });
+
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    let zipFile: yauzl.ZipFile | null = null;
+
+    const fail = (err: Error) => {
+      if (!settled) {
+        settled = true;
+        zipFile?.close();
+        reject(err);
+      }
+    };
+
+    yauzl.open(filePath, { lazyEntries: true }, (openError, openedZipFile) => {
+      if (openError) {
+        fail(openError);
+        return;
+      }
+
+      if (!openedZipFile) {
+        fail(new Error('Unable to open archive'));
+        return;
+      }
+
+      zipFile = openedZipFile;
+
+      openedZipFile.on('entry', (entry) => {
+        if (settled) return;
+
+        const entryPath = entry.fileName.replace(/\\/g, '/');
+        const targetPath = path.resolve(extractRoot, entryPath);
+
+        if (!isPathInsideDirectory(extractRoot, targetPath)) {
+          fail(new Error(`Archive entry escapes extraction directory: ${entryPath}`));
+          return;
+        }
+
+        if (entryPath.endsWith('/')) {
+          fs.mkdir(targetPath, { recursive: true })
+            .then(() => openedZipFile.readEntry())
+            .catch((err) => fail(err as Error));
+          return;
+        }
+
+        fs.mkdir(path.dirname(targetPath), { recursive: true })
+          .then(() => {
+            openedZipFile.openReadStream(entry, (streamError, readStream) => {
+              if (streamError) {
+                fail(streamError);
+                return;
+              }
+
+              if (!readStream) {
+                fail(new Error(`Unable to read archive entry: ${entryPath}`));
+                return;
+              }
+
+              pipeline(readStream, createWriteStream(targetPath))
+                .then(() => openedZipFile.readEntry())
+                .catch((err) => fail(err as Error));
+            });
+          })
+          .catch((err) => fail(err as Error));
+      });
+
+      openedZipFile.on('end', () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      });
+      openedZipFile.on('error', fail);
+      openedZipFile.readEntry();
+    });
+  });
+}
+
 // ─── Audit Prompt ────────────────────────────────────────────────────────────
 
 // Sanitize user-provided context to reduce prompt injection risk
@@ -490,16 +572,12 @@ export async function POST(req: NextRequest) {
     }
 
     const extractDir = path.join(tempDir, 'extracted');
-    await fs.mkdir(extractDir, { recursive: true });
     try {
-      // NOTE: This depends on system-level 'unzip' which may fail on Windows. Suggest using a cross-platform library like adm-zip or unzipper.
-      await execFileAsync('unzip', ['-o', '-q', filePath, '-d', extractDir], {
-        maxBuffer: 50 * 1024 * 1024,
-      });
+      await extractArchive(filePath, extractDir);
     } catch (unzipError: any) {
-      console.error('Unzip failed:', unzipError?.stderr || unzipError?.message || unzipError);
-      const message = "Extraction failed. The system requires 'unzip' to be available. Please install unzip or use a cross-platform extraction method.";
-      return NextResponse.json({ error: message }, { status: 500 });
+      console.error('Archive extraction failed:', unzipError?.message || unzipError);
+      const message = 'Extraction failed. The uploaded archive may be invalid or contain unsafe paths.';
+      return NextResponse.json({ error: message }, { status: 400 });
     }
 
     const files = await collectFiles(extractDir);
