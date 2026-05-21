@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="512" height="512">
+  <defs>
+    <linearGradient id="brandGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a855f7" />
+      <stop offset="100%" stop-color="#3b82f6" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity="0.15" />
+    </filter>
+  </defs>
+  
+  <!-- Outer Shield -->
+  <path d="M50 10 L15 25 V45 C15 70 30 88 50 95 C70 88 85 70 85 45 V25 Z" 
+        fill="url(#brandGradient)" filter="url(#shadow)" />
+        
+  <!-- Inner AI Sparkle (Star) -->
+  <path d="M50 28 C52 46 62 50 74 50 C62 52 52 56 50 74 C48 56 38 52 26 50 C38 48 48 46 50 28 Z" 
+        fill="#ffffff" />
+        
+  <!-- Decorative small sparks -->
+  <circle cx="32" cy="35" r="3" fill="#ffffff" opacity="0.8" />
+  <circle cx="68" cy="65" r="2" fill="#ffffff" opacity="0.6" />
+</svg>
