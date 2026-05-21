@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 100" width="760" height="200">
+  <defs>
+    <linearGradient id="brandGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a855f7" />
+      <stop offset="100%" stop-color="#3b82f6" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.15" />
+    </filter>
+    <style>
+      .text-bold {
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-size: 56px;
+        font-weight: 800;
+        letter-spacing: -1.5px;
+        fill: url(#brandGradient);
+      }
+      .text-light {
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-size: 56px;
+        font-weight: 300;
+        letter-spacing: -1px;
+        fill: #a855f7;
+      }
+    </style>
+  </defs>
+  
+  <!-- Shield Icon -->
+  <g transform="translate(10, 10) scale(0.8)">
+    <path d="M50 10 L15 25 V45 C15 70 30 88 50 95 C70 88 85 70 85 45 V25 Z" fill="url(#brandGradient)" filter="url(#shadow)" />
+    <path d="M50 28 C52 46 62 50 74 50 C62 52 52 56 50 74 C48 56 38 52 26 50 C38 48 48 46 50 28 Z" fill="#ffffff" />
+    <circle cx="32" cy="35" r="3" fill="#ffffff" opacity="0.8" />
+    <circle cx="68" cy="65" r="2" fill="#ffffff" opacity="0.6" />
+  </g>
+  
+  <!-- Text -->
+  <text x="105" y="70">
+    <tspan class="text-bold">Gracias</tspan>
+    <tspan class="text-light"> AI</tspan>
+  </text>
+</svg>
