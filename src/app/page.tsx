@@ -14,6 +14,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import Link from 'next/link';
 import { UserButton, SignedOut, SignedIn, useAuth, useClerk } from '@clerk/nextjs';
+import AIDebugger from './components/AIDebugger';
 import { buildFixPlanMarkdown, parseReportSummary } from '../utils/report-summary.mjs';
 
 type AuditPhase = 'idle' | 'uploading' | 'analyzing' | 'complete' | 'error';
@@ -1503,6 +1504,13 @@ export default function AuditPage() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* AI Debugger Component */}
+      <AIDebugger 
+        phase={phase} 
+        filesScanned={filesScanned} 
+        reportContent={reportContent} 
+      />
 
     </main>
   );
