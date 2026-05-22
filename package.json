@@ -2,12 +2,16 @@
   "name": "ipaship",
   "version": "1.0.0",
   "main": "index.js",
+  "bin": {
+    "ipaship": "./bin/ipaship.js"
+  },
   "engines": {
     "node": ">=20"
   },
   "scripts": {
     "dev": "next dev -p 8080",
     "build": "next build",
+    "compare": "node bin/ipaship.js compare",
     "start": "next start -H 0.0.0.0 -p 8080"
   },
   "keywords": [],
